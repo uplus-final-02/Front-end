@@ -66,7 +66,7 @@ const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
     navigate(`/content/${content.id}`);
   };
 
-  const handleEpisodeClick = (episodeId: string) => {
+  const handleEpisodeClick = (_episodeId: string) => {
     navigate(`/content/${content.id}`);
   };
 

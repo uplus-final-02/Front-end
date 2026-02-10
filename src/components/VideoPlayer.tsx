@@ -36,7 +36,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // 구독 여부에 따른 제한
   const canUseSpeedControl = user?.subscriptionType !== "none";
-  const maxQuality = user?.subscriptionType === "none" ? "480p" : "1080p";
 
   useEffect(() => {
     const video = videoRef.current;

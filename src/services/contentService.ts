@@ -21,7 +21,7 @@ export const contentService = {
     }
 
     if (filter?.tag) {
-      filtered = filtered.filter((c) => c.tags.includes(filter.tag));
+      filtered = filtered.filter((c) => c.tags.includes(filter.tag!));
     }
 
     return filtered;
@@ -56,7 +56,7 @@ export const contentService = {
 
   // 추천 콘텐츠 (태그 기반)
   getRecommendedContents: async (
-    userId: string,
+    _userId: string,
     preferredTags: string[],
   ): Promise<Content[]> => {
     await new Promise((resolve) => setTimeout(resolve, 300));

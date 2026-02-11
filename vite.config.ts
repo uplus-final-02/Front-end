@@ -11,6 +11,6 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    open: true,
+    open: false, // 자동으로 브라우저 열지 않음
   },
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, User, LogOut, Menu, X } from "lucide-react";
+import { Search, User, LogOut, Menu, X, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { contentService } from "@/services/contentService";
 import { Content } from "@/types";
@@ -13,7 +13,9 @@ const Header: React.FC = () => {
   const [suggestions, setSuggestions] = useState<Content[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // 외부 클릭 감지
   useEffect(() => {
@@ -23,6 +25,12 @@ const Header: React.FC = () => {
         !searchRef.current.contains(event.target as Node)
       ) {
         setShowSuggestions(false);
+      }
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowUserMenu(false);
       }
     };
 
@@ -128,14 +136,6 @@ const Header: React.FC = () => {
             >
               크리에이터
             </Link>
-            {user && (
-              <Link
-                to="/studio"
-                className="hover:text-primary transition-colors"
-              >
-                스튜디오
-              </Link>
-            )}
           </nav>
 
           {/* 검색 & 사용자 메뉴 */}
@@ -204,13 +204,36 @@ const Header: React.FC = () => {
             {/* 사용자 메뉴 */}
             {user ? (
               <div className="flex items-center space-x-4">
-                <Link
-                  to="/mypage"
-                  className="flex items-center space-x-2 hover:text-primary transition-colors"
-                >
-                  <User className="w-5 h-5" />
-                  <span className="hidden md:inline">{user.nickname}</span>
-                </Link>
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center space-x-2 hover:text-primary transition-colors"
+                  >
+                    <User className="w-5 h-5" />
+                    <span className="hidden md:inline">{user.nickname}</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+
+                  {/* 사용자 드롭다운 메뉴 */}
+                  {showUserMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl overflow-hidden z-50">
+                      <Link
+                        to="/mypage"
+                        onClick={() => setShowUserMenu(false)}
+                        className="block px-4 py-3 hover:bg-gray-800 transition-colors"
+                      >
+                        마이페이지
+                      </Link>
+                      <Link
+                        to="/studio"
+                        onClick={() => setShowUserMenu(false)}
+                        className="block px-4 py-3 hover:bg-gray-800 transition-colors"
+                      >
+                        스튜디오
+                      </Link>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={handleLogout}
                   className="flex items-center space-x-2 hover:text-primary transition-colors"
@@ -270,13 +293,22 @@ const Header: React.FC = () => {
                 크리에이터
               </Link>
               {user && (
-                <Link
-                  to="/studio"
-                  onClick={() => setShowMobileMenu(false)}
-                  className="hover:text-primary transition-colors"
-                >
-                  스튜디오
-                </Link>
+                <>
+                  <Link
+                    to="/mypage"
+                    onClick={() => setShowMobileMenu(false)}
+                    className="hover:text-primary transition-colors"
+                  >
+                    마이페이지
+                  </Link>
+                  <Link
+                    to="/studio"
+                    onClick={() => setShowMobileMenu(false)}
+                    className="hover:text-primary transition-colors"
+                  >
+                    스튜디오
+                  </Link>
+                </>
               )}
               <form onSubmit={handleSearch} className="pt-2">
                 <input

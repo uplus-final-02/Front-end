@@ -175,7 +175,10 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 space-y-12">
+      <div
+        className="container mx-auto px-4 py-8 space-y-12"
+        style={{ overflow: "visible" }}
+      >
         {/* Continue Watching */}
         {continueWatching.length > 0 && (
           <section>
@@ -250,6 +253,7 @@ const HomePage: React.FC = () => {
                     <ContentCard
                       content={content}
                       onCardClick={setSelectedContent}
+                      disableHover={true}
                     />
                   </div>
                 ))}

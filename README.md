@@ -1,10 +1,10 @@
-# U+ 스냅 (U+ SNAP) - OTT 플랫폼 UI 프로토타입
+# U-TOPIA - OTT 플랫폼 프론트엔드
 
 > 1~5분 짧은 러닝타임 콘텐츠를 제공하는 LG U+ 고객 맞춤형 OTT 플랫폼
 
 ## 🎬 프로젝트 소개
 
-U+ 스냅은 짧고 강렬한 5분 이내의 콘텐츠를 제공하는 차세대 OTT 플랫폼입니다.
+U-TOPIA는 짧고 강렬한 5분 이내의 콘텐츠를 제공하는 차세대 OTT 플랫폼입니다.
 출퇴근길, 점심시간 등 짧은 시간에 즐길 수 있는 프리미엄 콘텐츠를 제공합니다.
 
 ## ✨ 주요 기능
@@ -149,4 +149,5 @@ MIT License
 
 ## 🔗 링크
 
-- [GitHub Repository](https://github.com/Lilium0422/ott_ui_Prototype)
+- [GitHub Repository](https://github.com/uplus-final-02/Front-end)
+- [Vercel Deployment](https://ott-ui-prototype.vercel.app)

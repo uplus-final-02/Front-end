@@ -25,16 +25,21 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleSocialLogin = (provider: string) => {
+  const handleSocialLogin = () => {
     alert("개발 중인 서비스입니다.");
   };
 
   return (
-    <div className="min-h-screen bg-dark flex items-center justify-center px-4">
+    <div className="bg-dark flex justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-primary mb-2">OTT</h1>
-          <p className="text-gray-400">로그인하여 콘텐츠를 즐기세요</p>
+        <div className="text-center mb-6">
+          <Link to="/" className="inline-block text-3xl font-bold">
+            <span className="text-primary">U</span>
+            <span className="text-white">TOPIA</span>
+          </Link>
+          <p className="text-sm text-gray-400 mt-2">
+            로그인하여 콘텐츠를 즐기세요
+          </p>
         </div>
 
         <div className="bg-gray-900 rounded-lg p-8">
@@ -104,7 +109,7 @@ const LoginPage: React.FC = () => {
               {/* 카카오 로그인 */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("kakao")}
+                onClick={handleSocialLogin}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#FEE500] hover:bg-[#FDD835] text-[#000000] font-medium rounded-lg transition-colors"
               >
                 <svg
@@ -120,7 +125,7 @@ const LoginPage: React.FC = () => {
               {/* 네이버 로그인 */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("naver")}
+                onClick={handleSocialLogin}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#03C75A] hover:bg-[#02B350] text-white font-medium rounded-lg transition-colors"
               >
                 <svg
@@ -136,7 +141,7 @@ const LoginPage: React.FC = () => {
               {/* 구글 로그인 */}
               <button
                 type="button"
-                onClick={() => handleSocialLogin("google")}
+                onClick={handleSocialLogin}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-gray-800 font-medium rounded-lg transition-colors border border-gray-300"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -171,14 +176,11 @@ const LoginPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-gray-800">
-            <p className="text-sm text-gray-500 text-center mb-4">
-              테스트 계정
+          <div className="mt-4 pt-4 border-t border-gray-800 text-center">
+            <p className="text-xs text-gray-500">
+              테스트: test@example.com / password123 | LG U+: lgu@example.com /
+              password123
             </p>
-            <div className="space-y-2 text-sm text-gray-400">
-              <p>일반 회원: test@example.com / password123</p>
-              <p>LG U+ 회원: lgu@example.com / password123</p>
-            </div>
           </div>
         </div>
       </div>

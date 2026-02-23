@@ -38,6 +38,7 @@ U-TOPIA는 짧고 강렬한 5분 이내의 콘텐츠를 제공하는 차세대 O
 
 - **React Router DOM 6.22.0** - 라우팅
 - **HLS.js 1.5.7** - 비디오 스트리밍
+- **Axios** - HTTP 클라이언트 & API 통신
 - **Context API** - 상태 관리
 
 ## 시작하기

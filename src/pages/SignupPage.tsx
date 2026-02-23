@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { authService } from "@/services/authService";
 import { SYSTEM_TAGS } from "@/services/mockData";
+import { CheckCircle, XCircle } from "lucide-react";
 
 const SignupPage: React.FC = () => {
   const { signup } = useAuth();
@@ -17,6 +19,100 @@ const SignupPage: React.FC = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // 중복 확인 상태
+  const [emailCheck, setEmailCheck] = useState<{
+    checked: boolean;
+    isAvailable: boolean | null;
+    message: string;
+  }>({ checked: false, isAvailable: null, message: "" });
+
+  const [nicknameCheck, setNicknameCheck] = useState<{
+    checked: boolean;
+    isAvailable: boolean | null;
+    message: string;
+  }>({ checked: false, isAvailable: null, message: "" });
+
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [checkingNickname, setCheckingNickname] = useState(false);
+
+  // 이메일 중복 확인 버튼 클릭
+  const handleCheckEmail = async () => {
+    if (!formData.email) {
+      setEmailCheck({
+        checked: true,
+        isAvailable: false,
+        message: "이메일을 입력해주세요.",
+      });
+      return;
+    }
+
+    setCheckingEmail(true);
+    try {
+      const result = await authService.checkAvailability(
+        "email",
+        formData.email,
+      );
+      setEmailCheck({
+        checked: true,
+        isAvailable: result.isAvailable,
+        message: result.message,
+      });
+    } catch (error) {
+      setEmailCheck({
+        checked: true,
+        isAvailable: false,
+        message: "확인 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setCheckingEmail(false);
+    }
+  };
+
+  // 닉네임 중복 확인 버튼 클릭
+  const handleCheckNickname = async () => {
+    if (!formData.nickname) {
+      setNicknameCheck({
+        checked: true,
+        isAvailable: false,
+        message: "닉네임을 입력해주세요.",
+      });
+      return;
+    }
+
+    setCheckingNickname(true);
+    try {
+      const result = await authService.checkAvailability(
+        "nickname",
+        formData.nickname,
+      );
+      setNicknameCheck({
+        checked: true,
+        isAvailable: result.isAvailable,
+        message: result.message,
+      });
+    } catch (error) {
+      setNicknameCheck({
+        checked: true,
+        isAvailable: false,
+        message: "확인 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setCheckingNickname(false);
+    }
+  };
+
+  // 이메일 변경 시 중복 확인 초기화
+  const handleEmailChange = (value: string) => {
+    setFormData({ ...formData, email: value });
+    setEmailCheck({ checked: false, isAvailable: null, message: "" });
+  };
+
+  // 닉네임 변경 시 중복 확인 초기화
+  const handleNicknameChange = (value: string) => {
+    setFormData({ ...formData, nickname: value });
+    setNicknameCheck({ checked: false, isAvailable: null, message: "" });
+  };
+
   const handleTagToggle = (tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
@@ -26,6 +122,17 @@ const SignupPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // 중복 확인 검증
+    if (!emailCheck.checked || !emailCheck.isAvailable) {
+      setError("이메일 중복 확인을 완료해주세요.");
+      return;
+    }
+
+    if (!nicknameCheck.checked || !nicknameCheck.isAvailable) {
+      setError("닉네임 중복 확인을 완료해주세요.");
+      return;
+    }
 
     // 유효성 검증
     if (formData.password !== formData.confirmPassword) {
@@ -71,23 +178,52 @@ const SignupPage: React.FC = () => {
 
         <div className="bg-gray-900 rounded-lg p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* 이메일 */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-2">
                 이메일 *
               </label>
-              <input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                required
-                className="input-field"
-                placeholder="example@email.com"
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleEmailChange(e.target.value)}
+                    required
+                    className="input-field w-full"
+                    placeholder="example@email.com"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCheckEmail}
+                  disabled={checkingEmail || !formData.email}
+                  className="btn-secondary whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {checkingEmail ? "확인 중..." : "중복 확인"}
+                </button>
+              </div>
+              {/* 중복 확인 결과 */}
+              {emailCheck.checked && (
+                <div className="flex items-center gap-2 mt-2">
+                  {emailCheck.isAvailable ? (
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-500" />
+                  )}
+                  <p
+                    className={`text-sm ${
+                      emailCheck.isAvailable ? "text-green-500" : "text-red-500"
+                    }`}
+                  >
+                    {emailCheck.message}
+                  </p>
+                </div>
+              )}
             </div>
 
+            {/* 닉네임 */}
             <div>
               <label
                 htmlFor="nickname"
@@ -95,19 +231,49 @@ const SignupPage: React.FC = () => {
               >
                 닉네임 *
               </label>
-              <input
-                id="nickname"
-                type="text"
-                value={formData.nickname}
-                onChange={(e) =>
-                  setFormData({ ...formData, nickname: e.target.value })
-                }
-                required
-                className="input-field"
-                placeholder="닉네임을 입력하세요"
-              />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <input
+                    id="nickname"
+                    type="text"
+                    value={formData.nickname}
+                    onChange={(e) => handleNicknameChange(e.target.value)}
+                    required
+                    className="input-field w-full"
+                    placeholder="닉네임을 입력하세요"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCheckNickname}
+                  disabled={checkingNickname || !formData.nickname}
+                  className="btn-secondary whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {checkingNickname ? "확인 중..." : "중복 확인"}
+                </button>
+              </div>
+              {/* 중복 확인 결과 */}
+              {nicknameCheck.checked && (
+                <div className="flex items-center gap-2 mt-2">
+                  {nicknameCheck.isAvailable ? (
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-500" />
+                  )}
+                  <p
+                    className={`text-sm ${
+                      nicknameCheck.isAvailable
+                        ? "text-green-500"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {nicknameCheck.message}
+                  </p>
+                </div>
+              )}
             </div>
 
+            {/* 비밀번호 */}
             <div>
               <label
                 htmlFor="password"
@@ -128,6 +294,7 @@ const SignupPage: React.FC = () => {
               />
             </div>
 
+            {/* 비밀번호 확인 */}
             <div>
               <label
                 htmlFor="confirmPassword"
@@ -148,6 +315,7 @@ const SignupPage: React.FC = () => {
               />
             </div>
 
+            {/* 선호 태그 */}
             <div>
               <label className="block text-sm font-medium mb-3">
                 선호 태그 선택 * (최소 1개)
@@ -170,6 +338,7 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
+            {/* LG U+ 회원 */}
             <div className="flex items-center">
               <input
                 id="isLGUPlus"
@@ -185,12 +354,14 @@ const SignupPage: React.FC = () => {
               </label>
             </div>
 
+            {/* 에러 메시지 */}
             {error && (
               <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
                 {error}
               </div>
             )}
 
+            {/* 제출 버튼 */}
             <button
               type="submit"
               disabled={loading}

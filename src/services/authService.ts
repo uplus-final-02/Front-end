@@ -1,9 +1,24 @@
 import { User } from "@/types";
 import { mockUsers } from "./mockData";
+import apiClient from "./apiClient";
 
 const STORAGE_KEY = "ott_current_user";
 
 export const authService = {
+  // 이메일/닉네임 중복 확인
+  checkAvailability: async (
+    type: "email" | "nickname",
+    value: string,
+  ): Promise<{ isAvailable: boolean; message: string }> => {
+    try {
+      const response = await apiClient.get("/api/auth/check", {
+        params: { type, value },
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error("중복 확인에 실패했습니다.");
+    }
+  },
   // 로그인
   login: async (email: string, password: string): Promise<User> => {
     await new Promise((resolve) => setTimeout(resolve, 500)); // 네트워크 지연 시뮬레이션

@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Search, User, LogOut, Menu, X, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { contentService } from "@/services/contentService";
-import { Content } from "@/types";
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -191,15 +189,6 @@ const Header: React.FC = () => {
                   </Link>
                 </>
               )}
-              <form onSubmit={handleSearch} className="pt-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="검색..."
-                  className="input-field"
-                />
-              </form>
             </nav>
           </div>
         )}

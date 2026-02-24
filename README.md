@@ -1,6 +1,7 @@
 # U-TOPIA - OTT 플랫폼 프론트엔드
 
 > 1~5분 짧은 러닝타임 콘텐츠를 제공하는 LG U+ 고객 맞춤형 OTT 플랫폼
+<img width="1733" height="946" alt="image" src="https://github.com/user-attachments/assets/e81ef804-bec4-4e71-b81d-78344e6beaef" />
 
 ## 🎬 프로젝트 소개
 

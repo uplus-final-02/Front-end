@@ -9,7 +9,6 @@ import {
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
 import { useAuth } from "@/contexts/AuthContext";
-import { SYSTEM_TAGS } from "@/services/mockData";
 import ContentCard from "@/components/ContentCard";
 import ContentModal from "@/components/ContentModal";
 import { useNavigate } from "react-router-dom";
@@ -25,7 +24,6 @@ const HomePage: React.FC = () => {
   const [continueWatching, setContinueWatching] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("all");
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [chartScrollPosition, setChartScrollPosition] = useState(0);
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -79,11 +77,6 @@ const HomePage: React.FC = () => {
       filtered = filtered.filter((c) => c.type === "original");
     } else if (activeTab === "creator") {
       filtered = filtered.filter((c) => c.type === "creator");
-    }
-
-    // 태그 필터링
-    if (selectedTag) {
-      filtered = filtered.filter((c) => c.tags.includes(selectedTag));
     }
 
     return filtered;
@@ -282,36 +275,6 @@ const HomePage: React.FC = () => {
             </div>
           </section>
         )}
-
-        {/* Tags */}
-        <section>
-          <h2 className="text-2xl font-bold mb-4">태그별 탐색</h2>
-          <div className="flex flex-wrap gap-2 mb-6">
-            <button
-              onClick={() => setSelectedTag(null)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                selectedTag === null
-                  ? "bg-primary text-white"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-              }`}
-            >
-              전체
-            </button>
-            {SYSTEM_TAGS.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedTag(tag)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedTag === tag
-                    ? "bg-primary text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                }`}
-              >
-                #{tag}
-              </button>
-            ))}
-          </div>
-        </section>
 
         {/* Tabs */}
         <section>

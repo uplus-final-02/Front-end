@@ -11,6 +11,7 @@ import SubscribePage from "./pages/SubscribePage";
 import OriginalPage from "./pages/OriginalPage";
 import CreatorPage from "./pages/CreatorPage";
 import StudioPage from "./pages/StudioPage";
+import AdminPage from "./pages/AdminPage";
 
 const App: React.FC = () => {
   return (
@@ -27,6 +28,7 @@ const App: React.FC = () => {
         <Route path="/original" element={<OriginalPage />} />
         <Route path="/creator" element={<CreatorPage />} />
         <Route path="/studio" element={<StudioPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </div>
   );

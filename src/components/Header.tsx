@@ -136,6 +136,9 @@ const Header: React.FC = () => {
             >
               크리에이터
             </Link>
+            <Link to="/admin" className="hover:text-primary transition-colors">
+              백오피스
+            </Link>
           </nav>
 
           {/* 검색 & 사용자 메뉴 */}
@@ -291,6 +294,13 @@ const Header: React.FC = () => {
                 className="hover:text-primary transition-colors"
               >
                 크리에이터
+              </Link>
+              <Link
+                to="/admin"
+                onClick={() => setShowMobileMenu(false)}
+                className="hover:text-primary transition-colors"
+              >
+                백오피스
               </Link>
               {user && (
                 <>

@@ -35,31 +35,24 @@ const HomePage: React.FC = () => {
   const loadInitialContents = async () => {
     setLoading(true);
     try {
-      const [popular, all] = await Promise.all([
-        contentService.getPopularContents(10), // 10개로 변경
-        contentService.getContents(),
-      ]);
+      // 기본 콘텐츠 목록 조회
+      const defaultList = await contentService.getDefaultContentList();
 
-      setPopularContents(popular);
-      setAllContents(all);
+      setAllContents(defaultList);
+      setPopularContents(defaultList.slice(0, 10)); // 상위 10개를 인기 콘텐츠로
 
-      // 추천 콘텐츠
+      // 사용자 태그 기반 추천 (클라이언트 사이드 필터링)
       if (user && user.preferredTags.length > 0) {
-        const recommended = await contentService.getRecommendedContents(
-          user.id,
-          user.preferredTags,
+        const recommended = defaultList.filter((content) =>
+          content.tags.some((tag) => user.preferredTags.includes(tag)),
         );
         setRecommendedContents(recommended);
       }
 
-      // 이어보기
+      // 이어보기 (로그인 시)
       if (user) {
-        const history = await contentService.getWatchHistory(user.id);
-        const incomplete = history
-          .filter((h) => !h.completed)
-          .slice(0, 6)
-          .map((h) => h.content);
-        setContinueWatching(incomplete);
+        const watching = await contentService.getWatchingContentList();
+        setContinueWatching(watching);
       }
     } catch (error) {
       console.error("콘텐츠 로딩 실패:", error);
@@ -72,11 +65,11 @@ const HomePage: React.FC = () => {
   const getFilteredContents = () => {
     let filtered = [...allContents];
 
-    // 탭 필터링
+    // 탭 필터링 - 백엔드 accessLevel 기반
     if (activeTab === "original") {
-      filtered = filtered.filter((c) => c.type === "original");
+      filtered = filtered.filter((c) => c.accessLevel === "ORIGINAL");
     } else if (activeTab === "creator") {
-      filtered = filtered.filter((c) => c.type === "creator");
+      filtered = filtered.filter((c) => c.accessLevel === "CREATOR");
     }
 
     return filtered;

@@ -13,7 +13,7 @@ export interface User {
 }
 
 // 콘텐츠 타입
-export type ContentType = "original" | "creator";
+export type ContentType = "original" | "creator" | "movie" | "series";
 export type ContentStatus =
   | "uploading"
   | "processing"
@@ -23,21 +23,27 @@ export type ContentStatus =
 export interface Content {
   id: string;
   title: string;
-  description: string;
-  thumbnailUrl: string;
-  videoUrl: string;
-  duration: number; // 초 단위
+  description?: string;
+  thumbnail?: string;
+  thumbnailUrl?: string;
+  videoUrl?: string;
+  duration?: number | string; // 초 단위 또는 문자열
   tags: string[];
-  type: ContentType;
-  status: ContentStatus;
-  uploaderId: string;
-  uploaderName: string;
-  uploadDate: string;
-  viewCount: number;
-  bookmarkCount: number;
-  isOriginal: boolean;
-  isSeries: boolean; // 시리즈 여부
+  type?: ContentType;
+  status?: ContentStatus;
+  uploaderId?: string;
+  uploaderName?: string;
+  uploadDate?: string;
+  viewCount?: number;
+  bookmarkCount?: number;
+  isOriginal?: boolean;
+  isSeries?: boolean; // 시리즈 여부
   episodes?: Episode[];
+  // 백엔드 API 응답 필드
+  accessLevel?: string;
+  category?: string;
+  rating?: number;
+  year?: number;
 }
 
 // 에피소드 (시리즈용)

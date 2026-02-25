@@ -16,11 +16,20 @@ const ContentCard: React.FC<ContentCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+  const formatDuration = (duration: number | string | undefined) => {
+    if (!duration) return "0:00";
+    if (typeof duration === "string") return duration;
+    const mins = Math.floor(duration / 60);
+    const secs = duration % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+  // 안전한 필드 접근
+  const thumbnailUrl = content.thumbnailUrl || content.thumbnail || "";
+  const description = content.description || "";
+  const viewCount = content.viewCount || 0;
+  const bookmarkCount = content.bookmarkCount || 0;
+  const uploaderName = content.uploaderName || "알 수 없음";
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -38,7 +47,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
       <div onClick={handleClick} className="card cursor-pointer">
         <div className="relative aspect-video overflow-hidden">
           <img
-            src={content.thumbnailUrl}
+            src={thumbnailUrl}
             alt={content.title}
             className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
           />
@@ -62,20 +71,20 @@ const ContentCard: React.FC<ContentCardProps> = ({
             {content.title}
           </h3>
           <p className="text-sm text-gray-400 mb-3 line-clamp-2">
-            {content.description}
+            {description}
           </p>
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center space-x-3">
               <span className="flex items-center space-x-1">
                 <Eye className="w-3 h-3" />
-                <span>{content.viewCount.toLocaleString()}</span>
+                <span>{viewCount.toLocaleString()}</span>
               </span>
               <span className="flex items-center space-x-1">
                 <Bookmark className="w-3 h-3" />
-                <span>{content.bookmarkCount.toLocaleString()}</span>
+                <span>{bookmarkCount.toLocaleString()}</span>
               </span>
             </div>
-            <span className="text-gray-600">{content.uploaderName}</span>
+            <span className="text-gray-600">{uploaderName}</span>
           </div>
           <div className="flex flex-wrap gap-2 mt-3">
             {content.tags.map((tag, index) => (
@@ -103,7 +112,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
       <div onClick={handleClick}>
         <div className="relative aspect-video overflow-hidden rounded-lg">
           <img
-            src={content.thumbnailUrl}
+            src={thumbnailUrl}
             alt={content.title}
             className="w-full h-full object-cover"
           />
@@ -139,7 +148,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
       >
         <div className="relative aspect-video overflow-hidden rounded-t-lg">
           <img
-            src={content.thumbnailUrl}
+            src={thumbnailUrl}
             alt={content.title}
             className="w-full h-full object-cover"
           />
@@ -159,7 +168,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
             {content.title}
           </h3>
           <p className="text-sm text-gray-400 mb-3 line-clamp-2">
-            {content.description}
+            {description}
           </p>
           <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
             <div className="flex items-center space-x-3">
@@ -169,14 +178,14 @@ const ContentCard: React.FC<ContentCardProps> = ({
               </span>
               <span className="flex items-center space-x-1">
                 <Eye className="w-3 h-3" />
-                <span>{content.viewCount.toLocaleString()}</span>
+                <span>{viewCount.toLocaleString()}</span>
               </span>
               <span className="flex items-center space-x-1">
                 <Bookmark className="w-3 h-3" />
-                <span>{content.bookmarkCount.toLocaleString()}</span>
+                <span>{bookmarkCount.toLocaleString()}</span>
               </span>
             </div>
-            <span className="text-gray-600">{content.uploaderName}</span>
+            <span className="text-gray-600">{uploaderName}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {content.tags.map((tag, index) => (

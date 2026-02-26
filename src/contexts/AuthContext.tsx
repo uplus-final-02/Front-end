@@ -11,13 +11,13 @@ import { authService } from "@/services/authService";
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (
+  signupComplete: (
+    accessToken: string,
+    refreshToken: string,
     email: string,
-    password: string,
     nickname: string,
-    preferredTags: string[],
-    isLGUPlus: boolean,
-  ) => Promise<void>;
+    tagIds: number[],
+  ) => void;
   logout: () => void;
   updateUser: (updates: Partial<User>) => Promise<void>;
   subscribe: (subscriptionType: "basic" | "premium") => Promise<void>;
@@ -40,19 +40,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     setUser(loggedInUser);
   };
 
-  const signup = async (
+  const signupComplete = (
+    accessToken: string,
+    refreshToken: string,
     email: string,
-    password: string,
     nickname: string,
-    preferredTags: string[],
-    isLGUPlus: boolean,
+    tagIds: number[],
   ) => {
-    const newUser = await authService.signup(
+    const newUser = authService.saveAuthData(
+      accessToken,
+      refreshToken,
       email,
-      password,
       nickname,
-      preferredTags,
-      isLGUPlus,
+      tagIds,
     );
     setUser(newUser);
   };
@@ -64,19 +64,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
 
   const updateUser = async (updates: Partial<User>) => {
     if (!user) return;
-    const updatedUser = await authService.updateUser(user.id, updates);
+    const updatedUser = { ...user, ...updates };
+    localStorage.setItem("ott_current_user", JSON.stringify(updatedUser));
     setUser(updatedUser);
   };
 
   const subscribe = async (subscriptionType: "basic" | "premium") => {
     if (!user) return;
-    const updatedUser = await authService.subscribe(user.id, subscriptionType);
+    const updatedUser = { ...user, subscriptionType };
+    localStorage.setItem("ott_current_user", JSON.stringify(updatedUser));
     setUser(updatedUser);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, login, signup, logout, updateUser, subscribe }}
+      value={{ user, login, signupComplete, logout, updateUser, subscribe }}
     >
       {children}
     </AuthContext.Provider>

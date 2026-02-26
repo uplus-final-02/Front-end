@@ -360,7 +360,7 @@ const ContentDetailPage: React.FC = () => {
                       <span>
                         {(content.isSeries && currentEpisode
                           ? currentEpisode.viewCount
-                          : content.viewCount
+                          : (content.viewCount ?? 0)
                         ).toLocaleString()}{" "}
                         조회
                       </span>
@@ -371,13 +371,15 @@ const ContentDetailPage: React.FC = () => {
                         {formatDuration(
                           content.isSeries && currentEpisode
                             ? currentEpisode.duration
-                            : content.duration,
+                            : typeof content.duration === "number"
+                              ? content.duration
+                              : 0,
                         )}
                       </span>
                     </span>
                     <span className="flex items-center space-x-1">
                       <Calendar className="w-4 h-4" />
-                      <span>{formatDate(content.uploadDate)}</span>
+                      <span>{formatDate(content.uploadDate || "")}</span>
                     </span>
                   </div>
                 </div>

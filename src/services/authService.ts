@@ -1,203 +1,221 @@
 import { User } from "@/types";
-import { mockUsers } from "./mockData";
 import apiClient from "./apiClient";
 
 const STORAGE_KEY = "ott_current_user";
-
-// 개발 모드: Mock 사용 여부
-const USE_MOCK = true; // API 준비되면 false로 변경
+const TOKEN_KEY = "accessToken";
+const REFRESH_TOKEN_KEY = "refreshToken";
 
 export const authService = {
-  // 이메일/닉네임 중복 확인
-  checkAvailability: async (
-    type: "email" | "nickname",
-    value: string,
-  ): Promise<{ isAvailable: boolean; message: string }> => {
-    if (USE_MOCK) {
-      // Mock 응답
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return {
-        isAvailable: true,
-        message: "사용 가능합니다.",
-      };
-    }
+  // ══════════════════════════════════════════════════════════════
+  //  회원가입 4단계
+  // ══════════════════════════════════════════════════════════════
 
+  // STEP 1-A: 이메일 인증코드 발송
+  sendVerificationCode: async (email: string): Promise<void> => {
     try {
-      const response = await apiClient.get("/api/auth/check", {
-        params: { type, value },
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error("중복 확인에 실패했습니다.");
+      await apiClient.post("/api/auth/signup/email/send-code", { email });
+    } catch (error: any) {
+      if (error.response?.status === 409) {
+        throw new Error("이미 가입된 이메일입니다.");
+      }
+      throw new Error("인증코드 발송에 실패했습니다.");
     }
   },
 
-  // 로그인
-  login: async (email: string, password: string): Promise<User> => {
-    if (USE_MOCK) {
-      // Mock 로그인
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      const user = mockUsers.find(
-        (u) => u.email === email && u.password === password,
+  // STEP 1-B: 인증코드 검증 + 비밀번호 설정 → setupToken 발급
+  verifyCode: async (
+    email: string,
+    password: string,
+    code: string,
+  ): Promise<string> => {
+    try {
+      const response = await apiClient.post(
+        "/api/auth/signup/email/verify-code",
+        { email, password, code },
       );
-      if (!user) {
-        throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
+      return response.data.data.setupToken;
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        throw new Error("인증코드가 올바르지 않습니다.");
       }
-
-      const { password: _, ...userWithoutPassword } = user;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(userWithoutPassword));
-      return userWithoutPassword;
+      throw new Error("인증코드 검증에 실패했습니다.");
     }
+  },
 
-    // 실제 API 호출
+  // STEP 2: 닉네임 설정 → 새 setupToken 발급
+  setNickname: async (
+    setupToken: string,
+    nickname: string,
+  ): Promise<string> => {
+    try {
+      const response = await apiClient.post(
+        "/api/auth/signup/profile/nickname",
+        { nickname },
+        { headers: { Authorization: `Bearer ${setupToken}` } },
+      );
+      return response.data.data.setupToken;
+    } catch (error: any) {
+      if (error.response?.status === 409) {
+        throw new Error("이미 사용 중인 닉네임입니다.");
+      }
+      throw new Error("닉네임 설정에 실패했습니다.");
+    }
+  },
+
+  // STEP 3: 태그 선택 → 회원가입 완료 + JWT 발급
+  completeTags: async (
+    setupToken: string,
+    tagIds: number[],
+  ): Promise<{ accessToken: string; refreshToken: string }> => {
+    try {
+      const response = await apiClient.post(
+        "/api/auth/signup/profile/tags",
+        { tagIds },
+        { headers: { Authorization: `Bearer ${setupToken}` } },
+      );
+      const data = response.data.data;
+      return {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      };
+    } catch (error: any) {
+      throw new Error("회원가입 완료에 실패했습니다.");
+    }
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  //  로그인 / 로그아웃
+  // ══════════════════════════════════════════════════════════════
+
+  login: async (email: string, password: string): Promise<User> => {
     try {
       const response = await apiClient.post("/api/auth/login/email", {
         email,
         password,
       });
+      const data = response.data.data;
 
-      const { accessToken, refreshToken, expiresIn } = response.data;
-      localStorage.setItem("accessToken", accessToken);
-      localStorage.setItem("refreshToken", refreshToken);
-      localStorage.setItem("tokenExpiresIn", expiresIn.toString());
+      // 토큰 저장
+      localStorage.setItem(TOKEN_KEY, data.accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
 
-      // TODO: /api/users/me API 호출하여 실제 사용자 정보 가져오기
+      // 사용자 정보 구성 (JWT 디코딩 또는 기본값)
       const user: User = {
-        id: "temp",
+        id: "current",
         email,
-        nickname: "사용자",
+        nickname: email.split("@")[0],
         preferredTags: [],
-        subscriptionType: "none",
+        subscriptionType: "basic",
         isLGUPlus: false,
         joinDate: new Date().toISOString(),
       };
-
       localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
       return user;
     } catch (error: any) {
       if (error.response?.status === 401) {
         throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
       }
-      throw new Error("로그인에 실패했습니다. 다시 시도해주세요.");
+      throw new Error("로그인에 실패했습니다.");
     }
   },
 
-  // 회원가입
-  signup: async (
-    email: string,
-    password: string,
-    nickname: string,
-    preferredTags: string[],
-    isLGUPlus: boolean,
-  ): Promise<User> => {
-    if (USE_MOCK) {
-      // Mock 회원가입
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      if (mockUsers.some((u) => u.email === email)) {
-        throw new Error("이미 사용 중인 이메일입니다.");
-      }
-
-      if (mockUsers.some((u) => u.nickname === nickname)) {
-        throw new Error("이미 사용 중인 닉네임입니다.");
-      }
-
-      const newUser: User = {
-        id: `user${Date.now()}`,
-        email,
-        nickname,
-        preferredTags,
-        subscriptionType: isLGUPlus ? "basic" : "none",
-        isLGUPlus,
-        joinDate: new Date().toISOString(),
-        password,
-      };
-
-      mockUsers.push(newUser);
-      const { password: _, ...userWithoutPassword } = newUser;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(userWithoutPassword));
-      return userWithoutPassword;
-    }
-
-    // 실제 API 호출
-    try {
-      const response = await apiClient.post("/api/auth/signup/email", {
-        email,
-        password,
-        nickname,
-        preferenceTags: preferredTags,
-      });
-
-      const newUser: User = {
-        id: response.data.memberId.toString(),
-        email: response.data.email,
-        nickname: response.data.nickname,
-        preferredTags,
-        subscriptionType: isLGUPlus ? "basic" : "none",
-        isLGUPlus,
-        joinDate: new Date().toISOString(),
-      };
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
-      return newUser;
-    } catch (error: any) {
-      if (error.response?.status === 409) {
-        throw new Error("이미 사용 중인 이메일 또는 닉네임입니다.");
-      } else if (error.response?.status === 400) {
-        throw new Error(
-          error.response?.data?.message || "입력 정보를 확인해주세요.",
-        );
-      }
-      throw new Error("회원가입에 실패했습니다. 다시 시도해주세요.");
-    }
-  },
-
-  // 로그아웃
-  logout: () => {
+  logout: (): void => {
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("tokenExpiresIn");
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    // 백엔드 로그아웃 호출 (실패해도 무시)
+    apiClient.post("/api/auth/logout").catch(() => {});
   },
 
-  // 현재 사용자 가져오기
   getCurrentUser: (): User | null => {
-    const userStr = localStorage.getItem(STORAGE_KEY);
-    return userStr ? JSON.parse(userStr) : null;
-  },
-
-  // 사용자 정보 업데이트
-  updateUser: async (userId: string, updates: Partial<User>): Promise<User> => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    const userIndex = mockUsers.findIndex((u) => u.id === userId);
-    if (userIndex === -1) {
-      throw new Error("사용자를 찾을 수 없습니다.");
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored);
+    } catch {
+      return null;
     }
-
-    mockUsers[userIndex] = { ...mockUsers[userIndex], ...updates };
-    const { password: _, ...userWithoutPassword } = mockUsers[userIndex];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(userWithoutPassword));
-    return userWithoutPassword;
   },
 
-  // 구독 처리
-  subscribe: async (
-    userId: string,
-    subscriptionType: "basic" | "premium",
-  ): Promise<User> => {
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // 결제 시뮬레이션
-    return authService.updateUser(userId, { subscriptionType });
+  // 회원가입 완료 후 토큰 저장 + 사용자 정보 저장
+  saveAuthData: (
+    accessToken: string,
+    refreshToken: string,
+    email: string,
+    nickname: string,
+    _tagIds: number[],
+  ): User => {
+    localStorage.setItem(TOKEN_KEY, accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+
+    const user: User = {
+      id: "current",
+      email,
+      nickname,
+      preferredTags: [],
+      subscriptionType: "basic",
+      isLGUPlus: false,
+      joinDate: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    return user;
   },
 
-  // 회원 탈퇴
-  deleteAccount: async (userId: string): Promise<void> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const index = mockUsers.findIndex((u) => u.id === userId);
-    if (index !== -1) {
-      mockUsers.splice(index, 1);
+  // 토큰 가져오기
+  getAccessToken: (): string | null => {
+    return localStorage.getItem(TOKEN_KEY);
+  },
+
+  // 태그 목록 조회 (API 실패 시 하드코딩 fallback)
+  getTags: async (
+    section: string = "LEVEL_0",
+  ): Promise<{ tagId: number; name: string }[]> => {
+    try {
+      const response = await apiClient.get("/api/tags", {
+        params: { section },
+      });
+      return response.data.data;
+    } catch (error) {
+      console.error("태그 API 실패, fallback 사용:", error);
+      return [
+        { tagId: 1, name: "액션" },
+        { tagId: 2, name: "로맨스" },
+        { tagId: 3, name: "스릴러" },
+        { tagId: 4, name: "코미디" },
+        { tagId: 5, name: "SF" },
+        { tagId: 6, name: "판타지" },
+        { tagId: 7, name: "영화" },
+        { tagId: 8, name: "TV드라마" },
+        { tagId: 9, name: "예능" },
+        { tagId: 10, name: "다큐" },
+        { tagId: 11, name: "미스터리" },
+        { tagId: 12, name: "음악" },
+        { tagId: 13, name: "가족" },
+        { tagId: 14, name: "역사" },
+        { tagId: 15, name: "전쟁" },
+        { tagId: 16, name: "스포츠" },
+        { tagId: 17, name: "하이틴" },
+        { tagId: 18, name: "누아르" },
+        { tagId: 19, name: "무협" },
+        { tagId: 20, name: "히어로" },
+        { tagId: 21, name: "서바이벌" },
+        { tagId: 22, name: "추리" },
+        { tagId: 23, name: "법정" },
+        { tagId: 24, name: "메디컬" },
+        { tagId: 25, name: "공포" },
+        { tagId: 26, name: "팝콘각" },
+        { tagId: 27, name: "킬링타임" },
+        { tagId: 28, name: "인생작" },
+        { tagId: 29, name: "웃음나는" },
+        { tagId: 30, name: "게임" },
+      ];
     }
+  },
+
+  // 계정 삭제 (로컬 데이터 삭제)
+  deleteAccount: async (_userId: string): Promise<void> => {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   },
 };

@@ -11,11 +11,17 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { adminService } from "@/services/adminService";
+import type { AdminUser, AdminUserDetail } from "@/types";
 import {
-  adminService,
-  AdminUser,
-  AdminUserDetail,
-} from "@/services/adminService";
+  formatDate,
+  formatAuthProvider,
+  formatUserStatus,
+  formatPlanType,
+  formatPaymentStatus,
+  formatCurrency,
+} from "@/utils/formatters";
+import { ADMIN_CONSTANTS } from "@/constants";
 
 type TabType = "users" | "contents" | "stats";
 
@@ -109,7 +115,7 @@ const UsersManagement: React.FC<{
       const data = await adminService.getUsers({
         search: searchKeyword || undefined,
         page,
-        size: 20,
+        size: ADMIN_CONSTANTS.USERS_PER_PAGE,
       });
       setUsers(data.content);
       setTotalPages(data.totalPages);
@@ -141,54 +147,6 @@ const UsersManagement: React.FC<{
     } finally {
       setDetailLoading(false);
     }
-  };
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  };
-
-  const formatProvider = (provider: string) => {
-    const map: Record<string, string> = {
-      EMAIL: "이메일",
-      GOOGLE: "구글",
-      KAKAO: "카카오",
-      NAVER: "네이버",
-    };
-    return map[provider] || provider;
-  };
-
-  const formatStatus = (status: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      ACTIVE: { label: "활성", color: "bg-green-500/20 text-green-400" },
-      INACTIVE: { label: "비활성", color: "bg-gray-700 text-gray-400" },
-      SUSPENDED: { label: "정지", color: "bg-red-500/20 text-red-400" },
-      DELETED: { label: "탈퇴", color: "bg-red-500/20 text-red-400" },
-    };
-    return map[status] || { label: status, color: "bg-gray-700 text-gray-400" };
-  };
-
-  const formatPlan = (plan: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      FREE: { label: "무료", color: "bg-gray-700 text-gray-400" },
-      BASIC: { label: "베이직", color: "bg-blue-500/20 text-blue-400" },
-      PREMIUM: { label: "프리미엄", color: "bg-primary/20 text-primary" },
-    };
-    return map[plan] || { label: plan, color: "bg-gray-700 text-gray-400" };
-  };
-
-  const formatPaymentStatus = (status: string) => {
-    const map: Record<string, { label: string; color: string }> = {
-      COMPLETED: { label: "완료", color: "text-green-400" },
-      PENDING: { label: "대기", color: "text-yellow-400" },
-      FAILED: { label: "실패", color: "text-red-400" },
-      CANCELLED: { label: "취소", color: "text-gray-400" },
-    };
-    return map[status] || { label: status, color: "text-gray-400" };
   };
 
   return (
@@ -258,7 +216,7 @@ const UsersManagement: React.FC<{
                             key={i}
                             className="px-2 py-1 bg-gray-800 rounded text-xs"
                           >
-                            {formatProvider(m.authProvider)}
+                            {formatAuthProvider(m.authProvider)}
                           </span>
                         ))}
                       </div>
@@ -359,9 +317,9 @@ const UsersManagement: React.FC<{
                       <span className="text-gray-400">상태</span>
                       <p>
                         <span
-                          className={`px-2 py-1 rounded text-xs ${formatStatus(selectedUser.user.userStatus).color}`}
+                          className={`px-2 py-1 rounded text-xs ${formatUserStatus(selectedUser.user.userStatus).color}`}
                         >
-                          {formatStatus(selectedUser.user.userStatus).label}
+                          {formatUserStatus(selectedUser.user.userStatus).label}
                         </span>
                       </p>
                     </div>
@@ -389,10 +347,10 @@ const UsersManagement: React.FC<{
                         <span className="text-gray-400">플랜</span>
                         <p>
                           <span
-                            className={`px-2 py-1 rounded text-xs ${formatPlan(selectedUser.subscription.planType).color}`}
+                            className={`px-2 py-1 rounded text-xs ${formatPlanType(selectedUser.subscription.planType).color}`}
                           >
                             {
-                              formatPlan(selectedUser.subscription.planType)
+                              formatPlanType(selectedUser.subscription.planType)
                                 .label
                             }
                           </span>
@@ -428,7 +386,7 @@ const UsersManagement: React.FC<{
                         >
                           <div>
                             <p className="text-sm font-medium">
-                              {payment.amount.toLocaleString()}원
+                              {formatCurrency(payment.amount)}
                             </p>
                             <p className="text-xs text-gray-400">
                               {payment.paymentMethod} ·{" "}

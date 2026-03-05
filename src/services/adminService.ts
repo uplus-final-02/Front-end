@@ -6,10 +6,17 @@ import type {
   PageResponse,
 } from "@/types";
 
-// Admin API는 8082 포트 (vite 프록시로 /admin → localhost:8082)
+// Admin API Base URL
+const ADMIN_API_BASE_URL = import.meta.env.VITE_ADMIN_API_BASE_URL as string;
+
+// Admin API는 8882 포트 (vite 프록시로 /admin → localhost:8882)
 const adminClient = axios.create({
+  baseURL: ADMIN_API_BASE_URL,
   timeout: 10000,
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true", // ngrok 브라우저 경고 건너뛰기
+  },
 });
 
 export const adminService = {

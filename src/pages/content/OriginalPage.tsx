@@ -17,7 +17,9 @@ const OriginalPage: React.FC = () => {
   const loadContents = async () => {
     setLoading(true);
     try {
-      const data = await contentService.getContents({ type: "original" });
+      const data = await contentService.getDefaultContentList({
+        uploaderType: "ORIGINAL",
+      });
       setContents(data);
     } catch (error) {
       console.error("콘텐츠 로딩 실패:", error);

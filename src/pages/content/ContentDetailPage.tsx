@@ -12,7 +12,7 @@ import {
 import { Content, Comment, Episode } from "@/types";
 import { contentService } from "@/services/contentService";
 import { useAuth } from "@/contexts/AuthContext";
-import VideoPlayer from "@/components/VideoPlayer";
+import VideoPlayer from "@/components/common/VideoPlayer";
 
 const ContentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

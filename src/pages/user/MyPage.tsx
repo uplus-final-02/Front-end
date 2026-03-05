@@ -14,8 +14,8 @@ import { authService } from "@/services/authService";
 import { bookmarkService } from "@/services/bookmarkService";
 import type { Profile } from "@/types/profile";
 import type { BookmarkItem } from "@/types/bookmark";
-import ContentCard from "@/components/ContentCard";
-import ContentModal from "@/components/ContentModal";
+import ContentCard from "@/components/content/ContentCard";
+import ContentModal from "@/components/content/ContentModal";
 import type { Content } from "@/types";
 
 type Tab = "profile" | "bookmarks" | "history" | "stats";

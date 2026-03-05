@@ -9,8 +9,8 @@ import {
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
 import { useAuth } from "@/contexts/AuthContext";
-import ContentCard from "@/components/ContentCard";
-import ContentModal from "@/components/ContentModal";
+import ContentCard from "@/components/content/ContentCard";
+import ContentModal from "@/components/content/ContentModal";
 import { useNavigate } from "react-router-dom";
 
 type TabType = "all" | "original" | "creator";

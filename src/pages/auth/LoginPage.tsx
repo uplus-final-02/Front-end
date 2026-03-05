@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getOAuthUrl } from "@/utils/oauth";
+import type { SocialProvider } from "@/types";
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -25,8 +27,14 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleSocialLogin = () => {
-    alert("개발 중인 서비스입니다.");
+  const handleSocialLogin = (provider: SocialProvider) => {
+    try {
+      const authUrl = getOAuthUrl(provider);
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error("소셜 로그인 URL 생성 실패:", error);
+      setError("소셜 로그인을 시작할 수 없습니다.");
+    }
   };
 
   return (
@@ -109,7 +117,7 @@ const LoginPage: React.FC = () => {
               {/* 카카오 로그인 */}
               <button
                 type="button"
-                onClick={handleSocialLogin}
+                onClick={() => handleSocialLogin("kakao")}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#FEE500] hover:bg-[#FDD835] text-[#000000] font-medium rounded-lg transition-colors"
               >
                 <svg
@@ -125,7 +133,7 @@ const LoginPage: React.FC = () => {
               {/* 네이버 로그인 */}
               <button
                 type="button"
-                onClick={handleSocialLogin}
+                onClick={() => handleSocialLogin("naver")}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-[#03C75A] hover:bg-[#02B350] text-white font-medium rounded-lg transition-colors"
               >
                 <svg
@@ -141,7 +149,7 @@ const LoginPage: React.FC = () => {
               {/* 구글 로그인 */}
               <button
                 type="button"
-                onClick={handleSocialLogin}
+                onClick={() => handleSocialLogin("google")}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-gray-800 font-medium rounded-lg transition-colors border border-gray-300"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">

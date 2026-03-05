@@ -1,17 +1,19 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import Header from "./components/Header";
-import HomePage from "./pages/HomePage";
-import LoginPage from "./pages/LoginPage";
-import SignupPage from "./pages/SignupPage";
-import ContentDetailPage from "./pages/ContentDetailPage";
-import MyPage from "./pages/MyPage";
-import SearchPage from "./pages/SearchPage";
-import SubscribePage from "./pages/SubscribePage";
-import OriginalPage from "./pages/OriginalPage";
-import CreatorPage from "./pages/CreatorPage";
-import StudioPage from "./pages/StudioPage";
-import AdminPage from "./pages/AdminPage";
+import Header from "./components/common/Header";
+import HomePage from "./pages/content/HomePage";
+import LoginPage from "./pages/auth/LoginPage";
+import SignupPage from "./pages/auth/SignupPage";
+import ContentDetailPage from "./pages/content/ContentDetailPage";
+import MyPage from "./pages/user/MyPage";
+import SearchPage from "./pages/content/SearchPage";
+import SubscribePage from "./pages/user/SubscribePage";
+import OriginalPage from "./pages/content/OriginalPage";
+import CreatorPage from "./pages/creator/CreatorPage";
+import StudioPage from "./pages/creator/StudioPage";
+import AdminPage from "./pages/admin/AdminPage";
+import OAuthCallbackPage from "./pages/auth/OAuthCallbackPage";
+import SocialSetupPage from "./pages/auth/SocialSetupPage";
 
 const App: React.FC = () => {
   return (
@@ -29,6 +31,13 @@ const App: React.FC = () => {
         <Route path="/creator" element={<CreatorPage />} />
         <Route path="/studio" element={<StudioPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        {/* OAuth 콜백 라우트 */}
+        <Route
+          path="/oauth/callback/:provider"
+          element={<OAuthCallbackPage />}
+        />
+        {/* 소셜 로그인 후 추가 정보 입력 */}
+        <Route path="/social-setup" element={<SocialSetupPage />} />
       </Routes>
     </div>
   );

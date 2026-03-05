@@ -11,11 +11,13 @@ import {
 } from "lucide-react";
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
+import { bookmarkService } from "@/services/bookmarkService";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ContentModalProps {
   content: Content;
   onClose: () => void;
+  simpleMode?: boolean; // 간소화 모드 (북마크에서 온 경우)
 }
 
 const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
@@ -23,19 +25,40 @@ const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
   const navigate = useNavigate();
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [loadingEpisodes, setLoadingEpisodes] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
     checkBookmark();
+    loadEpisodes();
     return () => {
       document.body.style.overflow = "unset";
     };
   }, []);
 
+  const loadEpisodes = async () => {
+    if (content.type !== "series" && !content.isSeries) return;
+
+    setLoadingEpisodes(true);
+    try {
+      const episodeList = await contentService.getEpisodes(content.id);
+      setEpisodes(episodeList);
+    } catch (error) {
+      console.error("에피소드 조회 실패:", error);
+    } finally {
+      setLoadingEpisodes(false);
+    }
+  };
+
   const checkBookmark = async () => {
     if (!user) return;
     try {
-      const bookmarked = await contentService.isBookmarked(user.id, content.id);
+      // 북마크 목록을 조회해서 현재 콘텐츠가 있는지 확인
+      const response = await bookmarkService.getBookmarks(undefined, 100);
+      const bookmarked = response.bookmarks.some(
+        (b) => b.contentId === parseInt(content.id),
+      );
       setIsBookmarked(bookmarked);
     } catch (error) {
       console.error("찜하기 확인 실패:", error);
@@ -48,13 +71,23 @@ const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
       return;
     }
     try {
-      const bookmarked = await contentService.toggleBookmark(
-        user.id,
-        content.id,
-      );
-      setIsBookmarked(bookmarked);
-    } catch (error) {
+      const contentId = parseInt(content.id);
+      if (isBookmarked) {
+        // 찜 삭제
+        await bookmarkService.removeBookmark(contentId);
+        setIsBookmarked(false);
+      } else {
+        // 찜 추가
+        await bookmarkService.addBookmark(contentId);
+        setIsBookmarked(true);
+      }
+    } catch (error: any) {
       console.error("찜하기 실패:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "찜하기에 실패했습니다.";
+      alert(errorMessage);
     }
   };
 
@@ -175,10 +208,12 @@ const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
             <div className="col-span-2">
               <div className="flex items-center space-x-4 mb-4">
                 <span className="text-green-500 font-semibold">
-                  {content.viewCount.toLocaleString()} 조회
+                  {(content.viewCount ?? 0).toLocaleString()} 조회
                 </span>
                 <span className="text-gray-400">
-                  {formatDuration(content.duration)}
+                  {typeof content.duration === "number"
+                    ? formatDuration(content.duration)
+                    : content.duration || ""}
                 </span>
                 {content.isOriginal && (
                   <span className="bg-primary px-2 py-1 rounded text-xs font-bold">
@@ -219,21 +254,28 @@ const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
           </div>
 
           {/* 시리즈 에피소드 목록 */}
-          {content.isSeries &&
-            content.episodes &&
-            content.episodes.length > 0 && (
-              <div className="mt-8 border-t border-gray-800 pt-8">
-                <h3 className="text-2xl font-bold mb-4">에피소드</h3>
+          {(content.isSeries || content.type === "series") && (
+            <div className="mt-8 border-t border-gray-800 pt-8">
+              <h3 className="text-2xl font-bold mb-4">에피소드</h3>
+              {loadingEpisodes ? (
+                <div className="text-center py-8 text-gray-400">로딩 중...</div>
+              ) : episodes.length > 0 ? (
                 <div className="space-y-3">
-                  {content.episodes.map((episode) => (
+                  {episodes.map((episode) => (
                     <div
-                      key={episode.id}
-                      onClick={() => handleEpisodeClick(episode.id)}
+                      key={episode.videoId}
+                      onClick={() =>
+                        handleEpisodeClick(episode.videoId.toString())
+                      }
                       className="flex items-start space-x-4 p-4 bg-gray-800 hover:bg-gray-700 rounded-lg cursor-pointer transition-colors group"
                     >
                       <div className="flex-shrink-0 relative">
                         <img
-                          src={episode.thumbnailUrl}
+                          src={
+                            episode.thumbnailUrl ||
+                            content.thumbnail ||
+                            content.thumbnailUrl
+                          }
                           alt={episode.title}
                           className="w-32 h-18 object-cover rounded"
                         />
@@ -244,21 +286,26 @@ const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-semibold text-lg">
-                            {episode.title}
+                            {episode.episodeNo}화. {episode.title}
                           </h4>
                           <span className="text-sm text-gray-400 ml-2">
-                            {formatDuration(episode.duration)}
+                            {formatDuration(episode.durationSec || 0)}
                           </span>
                         </div>
                         <p className="text-sm text-gray-400 line-clamp-2">
-                          {episode.description}
+                          {episode.description || ""}
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  에피소드가 없습니다.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

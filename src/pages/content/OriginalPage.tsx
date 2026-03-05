@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Users } from "lucide-react";
+import { Crown } from "lucide-react";
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
-import ContentCard from "@/components/ContentCard";
-import ContentModal from "@/components/ContentModal";
+import ContentCard from "@/components/content/ContentCard";
+import ContentModal from "@/components/content/ContentModal";
 
-const CreatorPage: React.FC = () => {
+const OriginalPage: React.FC = () => {
   const [contents, setContents] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
@@ -17,7 +17,7 @@ const CreatorPage: React.FC = () => {
   const loadContents = async () => {
     setLoading(true);
     try {
-      const data = await contentService.getContents({ type: "creator" });
+      const data = await contentService.getContents({ type: "original" });
       setContents(data);
     } catch (error) {
       console.error("콘텐츠 로딩 실패:", error);
@@ -42,20 +42,18 @@ const CreatorPage: React.FC = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-3">
-            <Users className="w-8 h-8 text-primary" />
-            <h1 className="text-4xl font-bold">크리에이터 콘텐츠</h1>
+            <Crown className="w-8 h-8 text-primary" />
+            <h1 className="text-4xl font-bold">오리지널 콘텐츠</h1>
           </div>
           <p className="text-xl text-gray-400">
-            다양한 크리에이터들이 만든 창의적인 콘텐츠를 즐겨보세요
+            독점 제공되는 프리미엄 오리지널 콘텐츠를 만나보세요
           </p>
         </div>
 
         {contents.length === 0 ? (
           <div className="text-center py-20">
-            <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-xl text-gray-400">
-              크리에이터 콘텐츠가 없습니다.
-            </p>
+            <Crown className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-xl text-gray-400">오리지널 콘텐츠가 없습니다.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
@@ -80,4 +78,4 @@ const CreatorPage: React.FC = () => {
   );
 };
 
-export default CreatorPage;
+export default OriginalPage;

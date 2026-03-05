@@ -4,8 +4,8 @@ import { Search } from "lucide-react";
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
 import { SYSTEM_TAGS } from "@/services/mockData";
-import ContentCard from "@/components/ContentCard";
-import ContentModal from "@/components/ContentModal";
+import ContentCard from "@/components/content/ContentCard";
+import ContentModal from "@/components/content/ContentModal";
 
 type TabType = "all" | "original" | "creator";
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Users,
   Video,
@@ -7,7 +7,21 @@ import {
   Upload,
   Edit,
   Trash2,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { adminService } from "@/services/adminService";
+import type { AdminUser, AdminUserDetail } from "@/types";
+import {
+  formatDate,
+  formatAuthProvider,
+  formatUserStatus,
+  formatPlanType,
+  formatPaymentStatus,
+  formatCurrency,
+} from "@/utils/formatters";
+import { ADMIN_CONSTANTS } from "@/constants";
 
 type TabType = "users" | "contents" | "stats";
 
@@ -85,125 +99,317 @@ const UsersManagement: React.FC<{
   searchKeyword: string;
   setSearchKeyword: (value: string) => void;
 }> = ({ searchKeyword, setSearchKeyword }) => {
-  // Mock 데이터
-  const mockUsers = [
-    {
-      id: 1,
-      email: "user1@example.com",
-      nickname: "사용자1",
-      membership: "일반",
-      createdAt: "2024-01-15",
-    },
-    {
-      id: 2,
-      email: "user2@example.com",
-      nickname: "사용자2",
-      membership: "LG U+",
-      createdAt: "2024-02-20",
-    },
-    {
-      id: 3,
-      email: "user3@example.com",
-      nickname: "사용자3",
-      membership: "미구독",
-      createdAt: "2024-03-10",
-    },
-  ];
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [selectedUser, setSelectedUser] = useState<AdminUserDetail | null>(
+    null,
+  );
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await adminService.getUsers({
+        search: searchKeyword || undefined,
+        page,
+        size: ADMIN_CONSTANTS.USERS_PER_PAGE,
+      });
+      setUsers(data.content);
+      setTotalPages(data.totalPages);
+      setTotalElements(data.totalElements);
+    } catch (error) {
+      console.error("사용자 목록 조회 실패:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, searchKeyword]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  // 검색 시 페이지 리셋
+  useEffect(() => {
+    setPage(0);
+  }, [searchKeyword]);
+
+  const handleViewDetail = async (userId: number) => {
+    setDetailLoading(true);
+    try {
+      const detail = await adminService.getUserDetail(userId);
+      setSelectedUser(detail);
+    } catch (error) {
+      console.error("사용자 상세 조회 실패:", error);
+      alert("사용자 상세 정보를 불러올 수 없습니다.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   return (
     <div>
       {/* 검색 */}
-      <div className="mb-6">
-        <div className="relative max-w-md">
+      <div className="mb-6 flex items-center gap-4">
+        <div className="relative max-w-md flex-1">
           <input
             type="text"
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            placeholder="이메일 또는 닉네임으로 검색..."
+            placeholder="이름으로 검색..."
             className="w-full bg-gray-800 border border-gray-700 rounded pl-10 pr-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         </div>
+        <span className="text-sm text-gray-400">총 {totalElements}명</span>
       </div>
 
       {/* 사용자 목록 테이블 */}
       <div className="bg-gray-900 rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-800">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-medium">ID</th>
-              <th className="px-6 py-3 text-left text-sm font-medium">
-                이메일
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-medium">
-                닉네임
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-medium">
-                멤버십
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-medium">
-                가입일
-              </th>
-              <th className="px-6 py-3 text-left text-sm font-medium">액션</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800">
-            {mockUsers.map((user) => (
-              <tr
-                key={user.id}
-                className="hover:bg-gray-800/50 transition-colors"
-              >
-                <td className="px-6 py-4 text-sm">{user.id}</td>
-                <td className="px-6 py-4 text-sm">{user.email}</td>
-                <td className="px-6 py-4 text-sm">{user.nickname}</td>
-                <td className="px-6 py-4 text-sm">
-                  <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${
-                      user.membership === "LG U+"
-                        ? "bg-primary/20 text-primary"
-                        : user.membership === "일반"
-                          ? "bg-blue-500/20 text-blue-400"
-                          : "bg-gray-700 text-gray-400"
-                    }`}
-                  >
-                    {user.membership}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-400">
-                  {user.createdAt}
-                </td>
-                <td className="px-6 py-4 text-sm">
-                  <button
-                    onClick={() =>
-                      alert(`사용자 ${user.id} 상세 정보 (API 연동 예정)`)
-                    }
-                    className="text-primary hover:underline"
-                  >
-                    상세보기
-                  </button>
-                </td>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gray-800">
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-medium">ID</th>
+                <th className="px-6 py-3 text-left text-sm font-medium">
+                  이름
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium">
+                  로그인 방식
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium">
+                  가입일
+                </th>
+                <th className="px-6 py-3 text-left text-sm font-medium">
+                  액션
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {users.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-6 py-12 text-center text-gray-400"
+                  >
+                    사용자가 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                users.map((user) => (
+                  <tr
+                    key={user.userId}
+                    className="hover:bg-gray-800/50 transition-colors"
+                  >
+                    <td className="px-6 py-4 text-sm">{user.userId}</td>
+                    <td className="px-6 py-4 text-sm">{user.name}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <div className="flex gap-1 flex-wrap">
+                        {user.loginMethods.map((m, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-1 bg-gray-800 rounded text-xs"
+                          >
+                            {formatAuthProvider(m.authProvider)}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-400">
+                      {formatDate(user.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <button
+                        onClick={() => handleViewDetail(user.userId)}
+                        className="text-primary hover:underline"
+                      >
+                        상세보기
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* 페이지네이션 */}
-      <div className="mt-6 flex justify-center gap-2">
-        <button className="px-4 py-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors">
-          이전
-        </button>
-        <button className="px-4 py-2 bg-primary rounded">1</button>
-        <button className="px-4 py-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors">
-          2
-        </button>
-        <button className="px-4 py-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors">
-          3
-        </button>
-        <button className="px-4 py-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors">
-          다음
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center items-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="p-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+            const startPage = Math.max(0, Math.min(page - 2, totalPages - 5));
+            const pageNum = startPage + i;
+            if (pageNum >= totalPages) return null;
+            return (
+              <button
+                key={pageNum}
+                onClick={() => setPage(pageNum)}
+                className={`px-4 py-2 rounded transition-colors ${
+                  page === pageNum
+                    ? "bg-primary"
+                    : "bg-gray-800 hover:bg-gray-700"
+                }`}
+              >
+                {pageNum + 1}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="p-2 bg-gray-800 rounded hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 사용자 상세 모달 */}
+      {(selectedUser || detailLoading) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => setSelectedUser(null)}
+          />
+          <div className="relative bg-gray-900 rounded-lg p-8 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <button
+              onClick={() => setSelectedUser(null)}
+              className="absolute top-4 right-4 p-2 hover:bg-gray-800 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {detailLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : selectedUser ? (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold">사용자 상세 정보</h2>
+
+                {/* 기본 정보 */}
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">기본 정보</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">ID</span>
+                      <p>{selectedUser.user.userId}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">닉네임</span>
+                      <p>{selectedUser.user.nickname}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">상태</span>
+                      <p>
+                        <span
+                          className={`px-2 py-1 rounded text-xs ${formatUserStatus(selectedUser.user.userStatus).color}`}
+                        >
+                          {formatUserStatus(selectedUser.user.userStatus).label}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">가입일</span>
+                      <p>{formatDate(selectedUser.user.createdAt)}</p>
+                    </div>
+                    {selectedUser.user.deletedAt && (
+                      <div>
+                        <span className="text-gray-400">탈퇴일</span>
+                        <p className="text-red-400">
+                          {formatDate(selectedUser.user.deletedAt)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 구독 정보 */}
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">구독 정보</h3>
+                  {selectedUser.subscription ? (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-400">플랜</span>
+                        <p>
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${formatPlanType(selectedUser.subscription.planType).color}`}
+                          >
+                            {
+                              formatPlanType(selectedUser.subscription.planType)
+                                .label
+                            }
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">상태</span>
+                        <p>{selectedUser.subscription.subscriptionStatus}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">시작일</span>
+                        <p>{formatDate(selectedUser.subscription.startedAt)}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">만료일</span>
+                        <p>{formatDate(selectedUser.subscription.expiresAt)}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm">구독 정보 없음</p>
+                  )}
+                </div>
+
+                {/* 결제 이력 */}
+                <div className="bg-gray-800 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4">결제 이력</h3>
+                  {selectedUser.paymentHistory.length > 0 ? (
+                    <div className="space-y-3">
+                      {selectedUser.paymentHistory.map((payment) => (
+                        <div
+                          key={payment.paymentId}
+                          className="flex items-center justify-between bg-gray-900 rounded p-4"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">
+                              {formatCurrency(payment.amount)}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {payment.paymentMethod} ·{" "}
+                              {formatDate(payment.requestAt)}
+                            </p>
+                          </div>
+                          <span
+                            className={`text-sm ${formatPaymentStatus(payment.paymentStatus).color}`}
+                          >
+                            {formatPaymentStatus(payment.paymentStatus).label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm">결제 이력 없음</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

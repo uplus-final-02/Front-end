@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   TrendingUp,
   History,
@@ -9,8 +9,8 @@ import {
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
 import { useAuth } from "@/contexts/AuthContext";
-import ContentCard from "@/components/ContentCard";
-import ContentModal from "@/components/ContentModal";
+import ContentCard from "@/components/content/ContentCard";
+import ContentModal from "@/components/content/ContentModal";
 import { useNavigate } from "react-router-dom";
 
 type TabType = "all" | "original" | "creator";
@@ -27,6 +27,56 @@ const HomePage: React.FC = () => {
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [chartScrollPosition, setChartScrollPosition] = useState(0);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadingMoreRef = useRef(false);
+  const pageRef = useRef(0);
+
+  const loadMoreContents = useCallback(async () => {
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    try {
+      const nextPage = pageRef.current + 1;
+      const uploaderType =
+        activeTab === "original"
+          ? "ORIGINAL"
+          : activeTab === "creator"
+            ? "CREATOR"
+            : undefined;
+      const newContents = await contentService.getDefaultContentList({
+        uploaderType,
+        page: nextPage,
+        size: 15,
+      });
+      if (newContents.length < 15) {
+        setHasMore(false);
+      }
+      setAllContents((prev) => [...prev, ...newContents]);
+      pageRef.current = nextPage;
+    } catch (error) {
+      console.error("추가 콘텐츠 로딩 실패:", error);
+    } finally {
+      loadingMoreRef.current = false;
+    }
+  }, [activeTab]);
+
+  const loadMoreRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (observerRef.current) observerRef.current.disconnect();
+      if (!node) return;
+
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            loadMoreContents();
+          }
+        },
+        { threshold: 0.1 },
+      );
+      observerRef.current.observe(node);
+    },
+    [loadMoreContents],
+  );
 
   useEffect(() => {
     loadInitialContents();
@@ -35,31 +85,31 @@ const HomePage: React.FC = () => {
   const loadInitialContents = async () => {
     setLoading(true);
     try {
-      const [popular, all] = await Promise.all([
-        contentService.getPopularContents(10), // 10개로 변경
-        contentService.getContents(),
-      ]);
+      // 인기 콘텐츠용 (첫 페이지 데이터 활용)
+      const defaultList = await contentService.getDefaultContentList({
+        page: 0,
+        size: 15,
+      });
 
-      setPopularContents(popular);
-      setAllContents(all);
+      setAllContents(defaultList);
+      setPopularContents(defaultList.slice(0, 10)); // 상위 10개를 인기 콘텐츠로
+      if (defaultList.length < 15) {
+        setHasMore(false);
+      }
+      pageRef.current = 0;
 
-      // 추천 콘텐츠
+      // 사용자 태그 기반 추천 (클라이언트 사이드 필터링)
       if (user && user.preferredTags.length > 0) {
-        const recommended = await contentService.getRecommendedContents(
-          user.id,
-          user.preferredTags,
+        const recommended = defaultList.filter((content) =>
+          content.tags.some((tag) => user.preferredTags.includes(tag)),
         );
         setRecommendedContents(recommended);
       }
 
-      // 이어보기
+      // 이어보기 (로그인 시)
       if (user) {
-        const history = await contentService.getWatchHistory(user.id);
-        const incomplete = history
-          .filter((h) => !h.completed)
-          .slice(0, 6)
-          .map((h) => h.content);
-        setContinueWatching(incomplete);
+        const watching = await contentService.getWatchingContentList();
+        setContinueWatching(watching);
       }
     } catch (error) {
       console.error("콘텐츠 로딩 실패:", error);
@@ -68,21 +118,46 @@ const HomePage: React.FC = () => {
     }
   };
 
-  // 필터링된 콘텐츠 (클라이언트 사이드 - 즉시 반영)
-  const getFilteredContents = () => {
-    let filtered = [...allContents];
-
-    // 탭 필터링
-    if (activeTab === "original") {
-      filtered = filtered.filter((c) => c.type === "original");
-    } else if (activeTab === "creator") {
-      filtered = filtered.filter((c) => c.type === "creator");
+  // 탭 변경 시 콘텐츠 리셋
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
     }
+    setAllContents([]);
+    setHasMore(true);
+    pageRef.current = -1;
+    const loadTabContents = async () => {
+      loadingMoreRef.current = true;
+      try {
+        const uploaderType =
+          activeTab === "original"
+            ? "ORIGINAL"
+            : activeTab === "creator"
+              ? "CREATOR"
+              : undefined;
+        const newContents = await contentService.getDefaultContentList({
+          uploaderType,
+          page: 0,
+          size: 15,
+        });
+        if (newContents.length < 15) {
+          setHasMore(false);
+        }
+        setAllContents(newContents);
+        pageRef.current = 0;
+      } catch (error) {
+        console.error("콘텐츠 로딩 실패:", error);
+      } finally {
+        loadingMoreRef.current = false;
+      }
+    };
+    loadTabContents();
+  }, [activeTab]);
 
-    return filtered;
-  };
-
-  const filteredContents = getFilteredContents();
+  // 필터링된 콘텐츠 — 탭 필터링은 API에서 처리하므로 그대로 사용
+  const filteredContents = allContents;
 
   const handleChartScroll = (direction: "left" | "right") => {
     if (!chartContainerRef.current) return;
@@ -330,6 +405,13 @@ const HomePage: React.FC = () => {
               />
             ))}
           </div>
+
+          {/* 무한스크롤 로딩 트리거 */}
+          {hasMore && (
+            <div ref={loadMoreRef} className="flex justify-center py-8">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          )}
 
           {filteredContents.length === 0 && (
             <div className="text-center py-12 text-gray-400">

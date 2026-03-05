@@ -5,8 +5,7 @@ import axios, {
 } from "axios";
 
 // API Base URL
-export const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string) || "http://3.35.115.251:8081";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
 
 // Axios 인스턴스 생성
 export const apiClient = axios.create({
@@ -66,9 +65,9 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
-        // 리프레시 토큰도 만료됨 - 로그아웃 처리
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
+        // 리프레시 토큰도 만료됨 - 완전 로그아웃 처리
+        console.log("토큰 만료로 자동 로그아웃");
+        localStorage.clear(); // 모든 localStorage 데이터 삭제
         window.location.href = "/login";
         return Promise.reject(refreshError);
       }

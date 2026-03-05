@@ -275,7 +275,7 @@ const ContentDetailPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
               <div className="mb-6" ref={videoPlayerRef}>
-                {canWatch && (
+                {canWatch && currentVideoUrl && (
                   <VideoPlayer
                     videoUrl={currentVideoUrl}
                     onTimeUpdate={handleTimeUpdate}
@@ -310,7 +310,7 @@ const ContentDetailPage: React.FC = () => {
             }
           >
             <div className="mb-6" ref={videoPlayerRef}>
-              {canWatch ? (
+              {canWatch && currentVideoUrl ? (
                 <VideoPlayer
                   videoUrl={currentVideoUrl}
                   onTimeUpdate={handleTimeUpdate}

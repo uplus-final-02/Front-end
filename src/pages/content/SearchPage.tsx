@@ -33,7 +33,7 @@ const SearchPage: React.FC = () => {
 
   const loadAllContents = async () => {
     try {
-      const contents = await contentService.getContents();
+      const contents = await contentService.getDefaultContentList();
       setAllContents(contents);
     } catch (error) {
       console.error("콘텐츠 로딩 실패:", error);
@@ -48,8 +48,15 @@ const SearchPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const data = await contentService.searchContents(query);
-      setResults(data);
+      // 간단한 클라이언트 사이드 검색 (백엔드 검색 API 없음)
+      const filtered = allContents.filter(
+        (content) =>
+          content.title.toLowerCase().includes(query.toLowerCase()) ||
+          content.tags.some((tag) =>
+            tag.toLowerCase().includes(query.toLowerCase()),
+          ),
+      );
+      setResults(filtered);
     } catch (error) {
       console.error("검색 실패:", error);
     } finally {

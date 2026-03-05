@@ -17,7 +17,9 @@ const CreatorPage: React.FC = () => {
   const loadContents = async () => {
     setLoading(true);
     try {
-      const data = await contentService.getContents({ type: "creator" });
+      const data = await contentService.getDefaultContentList({
+        uploaderType: "CREATOR",
+      });
       setContents(data);
     } catch (error) {
       console.error("콘텐츠 로딩 실패:", error);

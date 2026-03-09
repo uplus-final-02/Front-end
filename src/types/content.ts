@@ -33,6 +33,9 @@ export interface Content {
   category?: string;
   rating?: number;
   year?: number;
+  // 인기 차트 필드
+  rank?: number;
+  trendingScore?: number;
 }
 
 export interface Episode {

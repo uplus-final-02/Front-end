@@ -33,6 +33,11 @@ const HomePage: React.FC = () => {
   const loadInitialContents = async () => {
     setLoading(true);
     try {
+      // 실시간 인기 차트 가져오기
+      const trendingContents = await contentService.getTrendingContents(10);
+      console.log("인기 차트:", trendingContents);
+      setPopularContents(trendingContents);
+
       // 전체 콘텐츠 가져오기
       const allContents = await contentService.getDefaultContentList({
         page: 0,
@@ -40,17 +45,19 @@ const HomePage: React.FC = () => {
       });
       console.log("전체 콘텐츠:", allContents);
 
-      setPopularContents(allContents.slice(0, 10));
-
       // 필터링 없이 전체 콘텐츠 중 15개만 오리지널 섹션에 표시
       setOriginalContents(allContents.slice(0, 15));
 
-      // 사용자 태그 기반 추천
-      if (user && user.preferredTags.length > 0) {
-        const recommended = allContents.filter((content) =>
-          content.tags.some((tag) => user.preferredTags.includes(tag)),
-        );
-        setRecommendedContents(recommended);
+      // 사용자 로그인 시 추천 콘텐츠 API 호출
+      if (user) {
+        try {
+          const recommendedData =
+            await contentService.getRecommendedContents(false);
+          setRecommendedContents(recommendedData.items);
+        } catch (error) {
+          console.error("추천 콘텐츠 조회 실패:", error);
+          setRecommendedContents([]);
+        }
       }
 
       // 이어보기

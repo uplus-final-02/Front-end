@@ -99,18 +99,39 @@ export const authService = {
       localStorage.setItem(TOKEN_KEY, data.accessToken);
       localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
 
-      // 사용자 정보 구성 (JWT 디코딩 또는 기본값)
-      const user: User = {
-        id: "current",
-        email,
-        nickname: email.split("@")[0],
-        preferredTags: [],
-        subscriptionType: "basic",
-        isLGUPlus: false,
-        joinDate: new Date().toISOString(),
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      return user;
+      // 프로필 API 호출하여 사용자 정보 가져오기
+      try {
+        const profileResponse = await apiClient.get("/api/profile/mypage");
+        const profile = profileResponse.data.data;
+
+        const user: User = {
+          id: profile.userId.toString(),
+          email: profile.email,
+          nickname: profile.nickname,
+          preferredTags: profile.preferredTags.map((tag: any) => tag.name), // 태그 이름 배열
+          subscriptionType:
+            profile.subscriptionStatus === "SUBSCRIBED" ? "basic" : "none",
+          isLGUPlus: profile.isUPlusMember || false,
+          joinDate: profile.createdAt,
+        };
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        return user;
+      } catch (profileError) {
+        console.error("프로필 조회 실패:", profileError);
+        // 프로필 조회 실패 시 기본 정보로 저장
+        const user: User = {
+          id: "current",
+          email,
+          nickname: email.split("@")[0],
+          preferredTags: [],
+          subscriptionType: "basic",
+          isLGUPlus: false,
+          joinDate: new Date().toISOString(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        return user;
+      }
     } catch (error: any) {
       if (error.response?.status === 401) {
         throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
@@ -143,7 +164,7 @@ export const authService = {
     refreshToken: string,
     email: string,
     nickname: string,
-    _tagIds: number[],
+    tagIds: number[],
   ): User => {
     localStorage.setItem(TOKEN_KEY, accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
@@ -152,7 +173,7 @@ export const authService = {
       id: "current",
       email,
       nickname,
-      preferredTags: [],
+      preferredTags: tagIds.map((id) => id.toString()), // tagIds를 문자열 배열로 변환
       subscriptionType: "basic",
       isLGUPlus: false,
       joinDate: new Date().toISOString(),

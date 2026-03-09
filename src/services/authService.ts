@@ -101,7 +101,26 @@ export const authService = {
 
       // 프로필 API 호출하여 사용자 정보 가져오기
       try {
-        const profileResponse = await apiClient.get("/api/profile/mypage");
+        // JWT에서 userId 추출
+        let userId = 1;
+        try {
+          const base64Url = data.accessToken.split(".")[1];
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join(""),
+          );
+          const payload = JSON.parse(jsonPayload);
+          userId = parseInt(payload.sub) || 1;
+        } catch (error) {
+          console.error("JWT 디코딩 실패:", error);
+        }
+
+        const profileResponse = await apiClient.get("/api/profile/mypage", {
+          params: { userId },
+        });
         const profile = profileResponse.data.data;
 
         const user: User = {

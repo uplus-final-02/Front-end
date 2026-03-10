@@ -14,14 +14,26 @@ export default defineConfig({
     open: false, // 자동으로 브라우저 열지 않음
     proxy: {
       "/api": {
-        target: "http://localhost:8881",
+        target: "https://ureca-utopia.duckdns.org",
         changeOrigin: true,
         secure: false,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.removeHeader("origin");
+            proxyReq.removeHeader("referer");
+          });
+        },
       },
       "/admin": {
-        target: "http://localhost:8882",
+        target: "https://ureca-utopia.duckdns.org",
         changeOrigin: true,
         secure: false,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.removeHeader("origin");
+            proxyReq.removeHeader("referer");
+          });
+        },
       },
     },
   },

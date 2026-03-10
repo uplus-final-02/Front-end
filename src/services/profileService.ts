@@ -50,10 +50,16 @@ export const profileService = {
    * 프로필 이미지 업로드 URL 발급
    */
   getPresignedUrl: async (extension: string): Promise<PresignedUrlResponse> => {
+    // 백엔드가 .jpg/.jpeg → image/jpeg, 그 외 → image/png로 서명하므로
+    // 서명에 사용된 contentType도 함께 반환
+    const contentType =
+      extension === ".jpg" || extension === ".jpeg"
+        ? "image/jpeg"
+        : "image/png";
     const response = await apiClient.get("/api/profile/image/presigned-url", {
       params: { extension },
     });
-    return response.data.data;
+    return { ...response.data.data, contentType };
   },
 
   /**

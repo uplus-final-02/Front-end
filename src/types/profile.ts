@@ -20,6 +20,7 @@ export interface Profile {
 export interface PresignedUrlResponse {
   uploadUrl: string;
   objectKey: string;
+  contentType: string;
 }
 
 export interface NicknameUpdateRequest {

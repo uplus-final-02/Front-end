@@ -38,7 +38,12 @@ const HomePage: React.FC = () => {
       // 실시간 인기 차트 가져오기
       const trendingContents = await contentService.getTrendingContents(10);
       console.log("인기 차트:", trendingContents);
-      setPopularContents(trendingContents);
+      // 중복 콘텐츠 제거 (같은 id가 여러 번 올 수 있음)
+      const uniqueTrending = trendingContents.filter(
+        (item, index, self) =>
+          self.findIndex((t) => t.id === item.id) === index,
+      );
+      setPopularContents(uniqueTrending);
 
       // 전체 콘텐츠 가져오기
       const allContents = await contentService.getDefaultContentList({

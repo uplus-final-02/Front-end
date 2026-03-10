@@ -8,9 +8,14 @@ import {
   Send,
   PlayCircle,
   MessageCircle,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Content, Comment, Episode } from "@/types";
 import { contentService } from "@/services/contentService";
+import { videoService, type VideoPlayInfo } from "@/services/videoService";
+import { bookmarkService } from "@/services/bookmarkService";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoPlayer from "@/components/common/VideoPlayer";
 
@@ -21,109 +26,50 @@ const ContentDetailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [content, setContent] = useState<Content | null>(null);
   const [currentEpisode, setCurrentEpisode] = useState<Episode | null>(null);
+  const [playInfo, setPlayInfo] = useState<VideoPlayInfo | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [lastPosition, setLastPosition] = useState(0);
-  const [isTransitioningToFullscreen, setIsTransitioningToFullscreen] =
-    useState(false);
+  const [playLoading, setPlayLoading] = useState(false);
+  const [playError, setPlayError] = useState<string | null>(null);
   const videoPlayerRef = useRef<HTMLDivElement>(null);
 
-  // URL 파라미터에서 autoplay와 fullscreen 확인
   const shouldAutoPlay = searchParams.get("autoplay") === "true";
-  const shouldFullscreen = searchParams.get("fullscreen") === "true";
+  const episodeParam = searchParams.get("episode");
 
-  useEffect(() => {
-    if (shouldFullscreen) {
-      setIsTransitioningToFullscreen(true);
-    }
-  }, [shouldFullscreen]);
-
+  // 콘텐츠 로드
   useEffect(() => {
     if (id) {
       loadContent();
-      checkBookmark();
-      loadWatchHistory();
     }
-  }, [id, user]);
+  }, [id]);
 
+  // 콘텐츠 로드 후 재생 정보 가져오기
   useEffect(() => {
-    if (content) {
-      if (content.isSeries && content.episodes && content.episodes.length > 0) {
-        setCurrentEpisode(content.episodes[0]);
+    if (!content) return;
+
+    if (content.isSeries && content.episodes && content.episodes.length > 0) {
+      // 시리즈: URL에 에피소드 지정이 있으면 해당 에피소드, 없으면 첫 에피소드
+      const targetEp = episodeParam
+        ? content.episodes.find((ep) => ep.id === episodeParam)
+        : content.episodes[0];
+      const ep = targetEp || content.episodes[0];
+      setCurrentEpisode(ep);
+      loadPlayInfo(ep.id);
+    } else if (!content.isSeries) {
+      // 단일 영상: episodes에서 videoId를 가져옴 (contentId ≠ videoId)
+      if (content.episodes && content.episodes.length > 0) {
+        loadPlayInfo(content.episodes[0].id);
+      } else {
+        // videoId를 알 수 없으면 콘텐츠 정보만 표시
+        setPlayError("재생 가능한 영상 정보를 찾을 수 없습니다.");
       }
-      loadComments();
     }
+
+    loadComments();
+    checkBookmark();
   }, [content]);
-
-  useEffect(() => {
-    if (currentEpisode) {
-      loadComments();
-    }
-  }, [currentEpisode]);
-
-  // 전체화면 자동 실행
-  useEffect(() => {
-    if (shouldFullscreen && videoPlayerRef.current && content && !loading) {
-      const timer = setTimeout(() => {
-        const videoElement = videoPlayerRef.current?.querySelector("video");
-        if (videoElement) {
-          // 비디오가 로드될 때까지 대기
-          const attemptFullscreen = () => {
-            if (videoElement.readyState >= 2) {
-              videoElement
-                .requestFullscreen()
-                .then(() => {
-                  setIsTransitioningToFullscreen(false);
-                })
-                .catch((err) => {
-                  console.error("전체화면 실패:", err);
-                  setIsTransitioningToFullscreen(false);
-                });
-            } else {
-              videoElement.addEventListener(
-                "loadeddata",
-                () => {
-                  videoElement
-                    .requestFullscreen()
-                    .then(() => {
-                      setIsTransitioningToFullscreen(false);
-                    })
-                    .catch((err) => {
-                      console.error("전체화면 실패:", err);
-                      setIsTransitioningToFullscreen(false);
-                    });
-                },
-                { once: true },
-              );
-            }
-          };
-
-          attemptFullscreen();
-
-          // 전체화면 종료 감지
-          const handleFullscreenChange = () => {
-            if (!document.fullscreenElement) {
-              setIsTransitioningToFullscreen(false);
-            }
-          };
-
-          document.addEventListener("fullscreenchange", handleFullscreenChange);
-
-          return () => {
-            document.removeEventListener(
-              "fullscreenchange",
-              handleFullscreenChange,
-            );
-          };
-        } else {
-          setIsTransitioningToFullscreen(false);
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [shouldFullscreen, content, loading]);
 
   const loadContent = async () => {
     if (!id) return;
@@ -135,6 +81,45 @@ const ContentDetailPage: React.FC = () => {
       console.error("콘텐츠 로딩 실패:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPlayInfo = async (videoId: string) => {
+    if (!user) {
+      setPlayError(null);
+      setPlayInfo(null);
+      return;
+    }
+
+    setPlayLoading(true);
+    setPlayError(null);
+    try {
+      const info = await videoService.getPlayInfo(videoId);
+      setPlayInfo(info);
+      setIsBookmarked(info.isBookmarked);
+
+      // 조회수 증가
+      try {
+        await videoService.increaseViewCount(videoId);
+      } catch (e) {
+        // 조회수 증가 실패는 무시
+      }
+
+      if (!info.url) {
+        setPlayError("현재 재생 가능한 영상이 없습니다.");
+      }
+    } catch (error: any) {
+      console.error("재생 정보 조회 실패:", error);
+      const status = error.response?.status;
+      if (status === 403) {
+        setPlayError("이 콘텐츠는 구독 회원만 시청할 수 있습니다.");
+      } else if (status === 404) {
+        setPlayError("영상 파일을 찾을 수 없습니다.");
+      } else {
+        setPlayError("재생 정보를 불러올 수 없습니다.");
+      }
+    } finally {
+      setPlayLoading(false);
     }
   };
 
@@ -153,23 +138,13 @@ const ContentDetailPage: React.FC = () => {
   const checkBookmark = async () => {
     if (!id || !user) return;
     try {
-      const bookmarked = await contentService.isBookmarked(user.id, id);
+      const response = await bookmarkService.getBookmarks(undefined, 100);
+      const bookmarked = response.bookmarks.some(
+        (b) => b.contentId === parseInt(id),
+      );
       setIsBookmarked(bookmarked);
     } catch (error) {
       console.error("찜하기 확인 실패:", error);
-    }
-  };
-
-  const loadWatchHistory = async () => {
-    if (!id || !user) return;
-    try {
-      const history = await contentService.getWatchHistory(user.id);
-      const currentHistory = history.find((h) => h.contentId === id);
-      if (currentHistory) {
-        setLastPosition(currentHistory.lastPosition);
-      }
-    } catch (error) {
-      console.error("시청 이력 로딩 실패:", error);
     }
   };
 
@@ -179,22 +154,53 @@ const ContentDetailPage: React.FC = () => {
       return;
     }
     try {
-      const bookmarked = await contentService.toggleBookmark(user.id, id);
-      setIsBookmarked(bookmarked);
-    } catch (error) {
+      const contentId = parseInt(id);
+      if (isBookmarked) {
+        await bookmarkService.removeBookmark(contentId);
+        setIsBookmarked(false);
+      } else {
+        await bookmarkService.addBookmark(contentId);
+        setIsBookmarked(true);
+      }
+    } catch (error: any) {
       console.error("찜하기 실패:", error);
+      alert(error.response?.data?.message || "찜하기에 실패했습니다.");
     }
   };
 
   const handleTimeUpdate = async (currentTime: number) => {
+    // 10초마다 시청 이력 저장
     if (!id || !user) return;
     if (Math.floor(currentTime) % 10 === 0) {
       try {
         await contentService.saveWatchHistory(user.id, id, currentTime);
       } catch (error) {
-        console.error("시청 이력 저장 실패:", error);
+        // 무시
       }
     }
+  };
+
+  const handleEpisodeSelect = (episode: Episode) => {
+    setCurrentEpisode(episode);
+    setPlayInfo(null);
+    loadPlayInfo(episode.id);
+  };
+
+  // 다음/이전 에피소드 이동 (play API context 활용)
+  const handleNextEpisode = () => {
+    if (!playInfo?.context?.nextVideoId || !content?.episodes) return;
+    const nextEp = content.episodes.find(
+      (ep) => ep.id === playInfo.context.nextVideoId!.toString(),
+    );
+    if (nextEp) handleEpisodeSelect(nextEp);
+  };
+
+  const handlePrevEpisode = () => {
+    if (!playInfo?.context?.prevVideoId || !content?.episodes) return;
+    const prevEp = content.episodes.find(
+      (ep) => ep.id === playInfo.context.prevVideoId!.toString(),
+    );
+    if (prevEp) handleEpisodeSelect(prevEp);
   };
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
@@ -215,11 +221,6 @@ const ContentDetailPage: React.FC = () => {
     } catch (error) {
       console.error("댓글 작성 실패:", error);
     }
-  };
-
-  const handleEpisodeSelect = (episode: Episode) => {
-    setCurrentEpisode(episode);
-    setLastPosition(0);
   };
 
   const formatDate = (dateString: string) => {
@@ -261,42 +262,9 @@ const ContentDetailPage: React.FC = () => {
     );
   }
 
-  const canWatch = user?.subscriptionType !== "none" || !content.isOriginal;
-  const currentVideoUrl =
-    content.isSeries && currentEpisode
-      ? currentEpisode.videoUrl
-      : content.videoUrl;
-
-  // 전체화면 전환 중이면 비디오 플레이어만 숨김 처리로 렌더링
-  if (isTransitioningToFullscreen) {
-    return (
-      <div className="min-h-screen bg-dark">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <div className="mb-6" ref={videoPlayerRef}>
-                {canWatch && currentVideoUrl && (
-                  <VideoPlayer
-                    videoUrl={currentVideoUrl}
-                    onTimeUpdate={handleTimeUpdate}
-                    startTime={lastPosition}
-                    autoPlay={shouldAutoPlay}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        {/* 전체화면 전환 오버레이 */}
-        <div className="fixed inset-0 bg-black z-40 flex items-center justify-center pointer-events-none">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-400">전체화면으로 전환 중...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // 재생 URL 결정
+  const videoUrl = playInfo?.url || null;
+  const startPosition = playInfo?.playbackState?.startPositionSec || 0;
 
   return (
     <div className="min-h-screen bg-dark">
@@ -309,31 +277,90 @@ const ContentDetailPage: React.FC = () => {
               content.isSeries ? "lg:col-span-2" : "max-w-5xl mx-auto w-full"
             }
           >
+            {/* 비디오 플레이어 영역 */}
             <div className="mb-6" ref={videoPlayerRef}>
-              {canWatch && currentVideoUrl ? (
+              {playLoading ? (
+                <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400">재생 정보 로딩 중...</p>
+                  </div>
+                </div>
+              ) : !user ? (
+                <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
+                  <div className="text-center">
+                    <AlertCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-xl mb-4">로그인이 필요합니다.</p>
+                    <button
+                      onClick={() => navigate("/login")}
+                      className="btn-primary"
+                    >
+                      로그인
+                    </button>
+                  </div>
+                </div>
+              ) : playError ? (
+                <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
+                  <div className="text-center">
+                    <AlertCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-xl mb-4">{playError}</p>
+                    {playError.includes("구독") && (
+                      <button
+                        onClick={() => navigate("/subscribe")}
+                        className="btn-primary"
+                      >
+                        구독하기
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : videoUrl ? (
                 <VideoPlayer
-                  videoUrl={currentVideoUrl}
+                  videoUrl={videoUrl}
                   onTimeUpdate={handleTimeUpdate}
-                  startTime={lastPosition}
+                  startTime={startPosition}
                   autoPlay={shouldAutoPlay}
                 />
               ) : (
-                <div className="aspect-video bg-gray-900 flex items-center justify-center">
+                <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
                   <div className="text-center">
-                    <p className="text-xl mb-4">
-                      이 콘텐츠는 구독 회원만 시청할 수 있습니다.
+                    <AlertCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-400">
+                      재생 가능한 영상이 없습니다.
                     </p>
-                    <button
-                      onClick={() => navigate("/subscribe")}
-                      className="btn-primary"
-                    >
-                      구독하기
-                    </button>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* 시리즈 에피소드 네비게이션 */}
+            {content.isSeries && playInfo?.context && (
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={handlePrevEpisode}
+                  disabled={!playInfo.context.prevVideoId}
+                  className="flex items-center gap-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>이전 화</span>
+                </button>
+                {playInfo.context.episodeNumber && (
+                  <span className="text-gray-400">
+                    {playInfo.context.episodeNumber}화
+                  </span>
+                )}
+                <button
+                  onClick={handleNextEpisode}
+                  disabled={!playInfo.context.nextVideoId}
+                  className="flex items-center gap-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <span>다음 화</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* 콘텐츠 정보 */}
             <div className="mb-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
@@ -358,9 +385,10 @@ const ContentDetailPage: React.FC = () => {
                     <span className="flex items-center space-x-1">
                       <Eye className="w-4 h-4" />
                       <span>
-                        {(content.isSeries && currentEpisode
-                          ? currentEpisode.viewCount
-                          : (content.viewCount ?? 0)
+                        {(
+                          playInfo?.viewCount ??
+                          content.viewCount ??
+                          0
                         ).toLocaleString()}{" "}
                         조회
                       </span>
@@ -369,23 +397,32 @@ const ContentDetailPage: React.FC = () => {
                       <Clock className="w-4 h-4" />
                       <span>
                         {formatDuration(
-                          content.isSeries && currentEpisode
-                            ? currentEpisode.duration
-                            : typeof content.duration === "number"
-                              ? content.duration
-                              : 0,
+                          playInfo?.durationSec ??
+                            (content.isSeries && currentEpisode
+                              ? currentEpisode.duration
+                              : typeof content.duration === "number"
+                                ? content.duration
+                                : 0),
                         )}
                       </span>
                     </span>
                     <span className="flex items-center space-x-1">
                       <Calendar className="w-4 h-4" />
-                      <span>{formatDate(content.uploadDate || "")}</span>
+                      <span>
+                        {formatDate(
+                          playInfo?.createdAt || content.uploadDate || "",
+                        )}
+                      </span>
                     </span>
                   </div>
                 </div>
                 <button
                   onClick={handleToggleBookmark}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded transition-colors ${isBookmarked ? "bg-primary text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700"}`}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded transition-colors ${
+                    isBookmarked
+                      ? "bg-primary text-white"
+                      : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                  }`}
                 >
                   <Bookmark
                     className={`w-5 h-5 ${isBookmarked ? "fill-current" : ""}`}
@@ -395,12 +432,13 @@ const ContentDetailPage: React.FC = () => {
               </div>
               <div className="bg-gray-900 rounded-lg p-6 mb-6">
                 <p className="text-gray-300 leading-relaxed mb-4">
-                  {content.isSeries && currentEpisode
-                    ? currentEpisode.description
-                    : content.description}
+                  {playInfo?.description ||
+                    (content.isSeries && currentEpisode
+                      ? currentEpisode.description
+                      : content.description)}
                 </p>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {content.tags.map((tag, index) => (
+                  {(playInfo?.tags || content.tags).map((tag, index) => (
                     <span
                       key={index}
                       className="bg-gray-800 px-3 py-1 rounded-full text-sm text-gray-300"
@@ -410,22 +448,16 @@ const ContentDetailPage: React.FC = () => {
                   ))}
                 </div>
                 <div className="pt-4 border-t border-gray-800 text-sm text-gray-400">
-                  업로더: {content.uploaderName}
+                  업로더: {playInfo?.uploaderNickname || content.uploaderName}
                 </div>
               </div>
             </div>
 
+            {/* 댓글 */}
             <div className="bg-gray-900 rounded-lg p-6">
               <h2 className="text-xl font-bold mb-4 flex items-center space-x-2">
                 <MessageCircle className="w-5 h-5" />
-                <span>
-                  댓글 {comments.length}개
-                  {content.isSeries && currentEpisode && (
-                    <span className="text-sm text-gray-400 ml-2">
-                      ({currentEpisode.title})
-                    </span>
-                  )}
-                </span>
+                <span>댓글 {comments.length}개</span>
               </h2>
               {user ? (
                 <form onSubmit={handleCommentSubmit} className="mb-6">
@@ -486,6 +518,7 @@ const ContentDetailPage: React.FC = () => {
             </div>
           </div>
 
+          {/* 시리즈 에피소드 사이드바 */}
           {content.isSeries &&
             content.episodes &&
             content.episodes.length > 0 && (
@@ -497,12 +530,20 @@ const ContentDetailPage: React.FC = () => {
                       <div
                         key={episode.id}
                         onClick={() => handleEpisodeSelect(episode)}
-                        className={`cursor-pointer rounded-lg p-4 transition-all ${currentEpisode?.id === episode.id ? "bg-primary text-white" : "bg-gray-800 hover:bg-gray-700"}`}
+                        className={`cursor-pointer rounded-lg p-4 transition-all ${
+                          currentEpisode?.id === episode.id
+                            ? "bg-primary text-white"
+                            : "bg-gray-800 hover:bg-gray-700"
+                        }`}
                       >
                         <div className="flex items-start space-x-3">
                           <div className="relative flex-shrink-0">
                             <img
-                              src={episode.thumbnailUrl}
+                              src={
+                                episode.thumbnailUrl ||
+                                content.thumbnailUrl ||
+                                content.thumbnail
+                              }
                               alt={episode.title}
                               className="w-24 h-14 object-cover rounded"
                             />
@@ -514,13 +555,8 @@ const ContentDetailPage: React.FC = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-sm mb-1 line-clamp-1">
-                              {episode.title}
+                              {episode.episodeNumber}화. {episode.title}
                             </h3>
-                            <p
-                              className={`text-xs mb-2 line-clamp-2 ${currentEpisode?.id === episode.id ? "text-white/80" : "text-gray-400"}`}
-                            >
-                              {episode.description}
-                            </p>
                             <div className="flex items-center space-x-3 text-xs">
                               <span className="flex items-center space-x-1">
                                 <Clock className="w-3 h-3" />

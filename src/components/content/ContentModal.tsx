@@ -99,8 +99,8 @@ const ContentModal: React.FC<ContentModalProps> = ({ content, onClose }) => {
     navigate(`/content/${content.id}`);
   };
 
-  const handleEpisodeClick = (_episodeId: string) => {
-    navigate(`/content/${content.id}`);
+  const handleEpisodeClick = (episodeVideoId: string) => {
+    navigate(`/content/${content.id}?episode=${episodeVideoId}`);
   };
 
   const formatDuration = (seconds: number) => {

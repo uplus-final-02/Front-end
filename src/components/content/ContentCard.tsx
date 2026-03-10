@@ -81,9 +81,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
           <h3 className="font-semibold text-lg mb-2 line-clamp-1">
             {content.title}
           </h3>
-          <p className="text-sm text-gray-400 mb-3 line-clamp-2">
-            {description}
-          </p>
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center space-x-3">
               <span className="flex items-center space-x-1">
@@ -95,17 +92,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
                 <span>{bookmarkCount.toLocaleString()}</span>
               </span>
             </div>
-            <span className="text-gray-600">{uploaderName}</span>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-3">
-            {content.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="bg-gray-800 px-2 py-1 rounded text-xs text-gray-300"
-              >
-                #{tag}
-              </span>
-            ))}
           </div>
         </div>
       </div>

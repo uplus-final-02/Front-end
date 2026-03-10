@@ -21,7 +21,19 @@ apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("accessToken");
     if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // 토큰 만료 여부 간단 체크 (JWT payload의 exp)
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          // 만료된 토큰은 보내지 않음 (reissue는 response 인터셉터에서 처리)
+          localStorage.removeItem("accessToken");
+        } else {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      } catch {
+        // 파싱 실패하면 토큰 제거
+        localStorage.removeItem("accessToken");
+      }
     }
     return config;
   },
@@ -47,16 +59,19 @@ apiClient.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem("refreshToken");
         if (refreshToken) {
-          // 토큰 재발급 API 호출
+          // 토큰 재발급 API 호출 (인터셉터 없는 별도 요청으로 무한루프 방지)
           const response = await axios.post(
-            `${API_BASE_URL}/api/auth/reissue`,
-            {
-              refreshToken,
-            },
+            `${API_BASE_URL || ""}/api/auth/reissue`,
+            { refreshToken },
+            { headers: { "Content-Type": "application/json" } },
           );
 
-          const { accessToken } = response.data;
+          const { accessToken, refreshToken: newRefreshToken } =
+            response.data.data;
           localStorage.setItem("accessToken", accessToken);
+          if (newRefreshToken) {
+            localStorage.setItem("refreshToken", newRefreshToken);
+          }
 
           // 원래 요청 재시도
           if (originalRequest.headers) {
@@ -67,7 +82,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         // 리프레시 토큰도 만료됨 - 완전 로그아웃 처리
         console.log("토큰 만료로 자동 로그아웃");
-        localStorage.clear(); // 모든 localStorage 데이터 삭제
+        localStorage.clear();
         window.location.href = "/login";
         return Promise.reject(refreshError);
       }

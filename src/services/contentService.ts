@@ -224,17 +224,18 @@ export const contentService = {
       const response = await apiClient.get(`/api/contents/${contentId}`);
       const item = response.data;
 
-      // 에피소드 목록 조회 (시리즈인 경우만)
+      // 에피소드(비디오) 목록 조회
+      // SERIES: episodes-list API로 videoId 목록 가져옴
+      // SINGLE: episodes-list API가 에러를 던지므로 try-catch로 처리
       let episodes: any[] = [];
-      if (item.type === "SERIES") {
-        try {
-          const episodesResponse = await apiClient.get(
-            `/api/contents/${contentId}/episodes-list`,
-          );
-          episodes = episodesResponse.data.episodes || [];
-        } catch (error) {
-          console.error("에피소드 조회 실패:", error);
-        }
+      try {
+        const episodesResponse = await apiClient.get(
+          `/api/contents/${contentId}/episodes-list`,
+        );
+        episodes = episodesResponse.data.episodes || [];
+      } catch (error) {
+        // SINGLE 콘텐츠이거나 에피소드가 없는 경우
+        console.log("에피소드 조회 불가 (단일 콘텐츠일 수 있음)");
       }
 
       return {
@@ -259,10 +260,7 @@ export const contentService = {
         status: item.status,
         isOriginal: item.accessLevel === "UPLUS",
         isSeries: item.type === "SERIES",
-        videoUrl:
-          item.type === "SINGLE"
-            ? "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"
-            : "", // 샘플 HLS URL
+        videoUrl: "", // play API에서 실제 URL을 가져옴
         episodes: episodes.map((ep: any) => ({
           id: ep.videoId.toString(),
           contentId: contentId,
@@ -270,7 +268,7 @@ export const contentService = {
           title: ep.title,
           description: ep.description || "",
           thumbnailUrl: ep.thumbnailUrl || item.thumbnailUrl,
-          videoUrl: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", // 샘플 HLS URL
+          videoUrl: "", // play API에서 실제 URL을 가져옴
           duration: ep.durationSec || 0,
           viewCount: ep.viewCount || 0,
         })),

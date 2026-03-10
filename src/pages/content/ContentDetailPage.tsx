@@ -15,6 +15,7 @@ import {
 import { Content, Comment, Episode } from "@/types";
 import { contentService } from "@/services/contentService";
 import { videoService, type VideoPlayInfo } from "@/services/videoService";
+import { historyService } from "@/services/historyService";
 import { bookmarkService } from "@/services/bookmarkService";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoPlayer from "@/components/common/VideoPlayer";
@@ -34,6 +35,8 @@ const ContentDetailPage: React.FC = () => {
   const [playLoading, setPlayLoading] = useState(false);
   const [playError, setPlayError] = useState<string | null>(null);
   const videoPlayerRef = useRef<HTMLDivElement>(null);
+  const currentVideoIdRef = useRef<string | null>(null);
+  const lastSaveTimeRef = useRef(0);
 
   const shouldAutoPlay = searchParams.get("autoplay") === "true";
   const episodeParam = searchParams.get("episode");
@@ -44,6 +47,33 @@ const ContentDetailPage: React.FC = () => {
       loadContent();
     }
   }, [id]);
+
+  // 페이지 이탈 시 마지막 위치 저장
+  useEffect(() => {
+    const saveOnLeave = () => {
+      if (currentVideoIdRef.current && user) {
+        const video = document.querySelector("video");
+        if (video && video.currentTime > 0) {
+          // sendBeacon으로 비동기 저장 (페이지 이탈에도 전송 보장)
+          const data = JSON.stringify({
+            positionSec: Math.floor(video.currentTime),
+            playDurationSec: 0,
+          });
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+          navigator.sendBeacon(
+            `${baseUrl}/api/histories/savepoint/${currentVideoIdRef.current}`,
+            new Blob([data], { type: "application/json" }),
+          );
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", saveOnLeave);
+    return () => {
+      saveOnLeave();
+      window.removeEventListener("beforeunload", saveOnLeave);
+    };
+  }, [user]);
 
   // 콘텐츠 로드 후 재생 정보 가져오기
   useEffect(() => {
@@ -91,6 +121,8 @@ const ContentDetailPage: React.FC = () => {
       return;
     }
 
+    currentVideoIdRef.current = videoId;
+    lastSaveTimeRef.current = 0;
     setPlayLoading(true);
     setPlayError(null);
     try {
@@ -168,19 +200,40 @@ const ContentDetailPage: React.FC = () => {
     }
   };
 
-  const handleTimeUpdate = async (currentTime: number) => {
-    // 10초마다 시청 이력 저장
-    if (!id || !user) return;
-    if (Math.floor(currentTime) % 10 === 0) {
+  const handleTimeUpdate = async (
+    currentTime: number,
+    playDurationSec: number,
+  ) => {
+    if (!user || !currentVideoIdRef.current) return;
+
+    // 10초마다 savepoint API 호출
+    const now = Math.floor(currentTime);
+    if (now - lastSaveTimeRef.current >= 10) {
+      lastSaveTimeRef.current = now;
       try {
-        await contentService.saveWatchHistory(user.id, id, currentTime);
+        await historyService.savePoint(currentVideoIdRef.current, {
+          positionSec: Math.floor(currentTime),
+          playDurationSec: Math.floor(playDurationSec),
+        });
       } catch (error) {
-        // 무시
+        // savepoint 실패는 무시 (재생에 영향 없음)
       }
     }
   };
 
-  const handleEpisodeSelect = (episode: Episode) => {
+  const handleEpisodeSelect = async (episode: Episode) => {
+    // 에피소드 전환 전 현재 위치 저장
+    if (currentVideoIdRef.current && user) {
+      const video = document.querySelector("video");
+      if (video) {
+        try {
+          await historyService.savePoint(currentVideoIdRef.current, {
+            positionSec: Math.floor(video.currentTime),
+            playDurationSec: 0,
+          });
+        } catch {}
+      }
+    }
     setCurrentEpisode(episode);
     setPlayInfo(null);
     loadPlayInfo(episode.id);

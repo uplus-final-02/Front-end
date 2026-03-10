@@ -7,13 +7,138 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronRight as ArrowRight,
+  Clock,
+  Play,
 } from "lucide-react";
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
+import {
+  historyService,
+  type WatchHistoryItem,
+} from "@/services/historyService";
 import { useAuth } from "@/contexts/AuthContext";
 import ContentCard from "@/components/content/ContentCard";
 import ContentModal from "@/components/content/ContentModal";
 import { useNavigate } from "react-router-dom";
+
+// 이어서 시청하기 카드 (호버 확대 + 상세 정보)
+const WatchingCard: React.FC<{
+  item: WatchHistoryItem;
+  onClick: () => void;
+}> = ({ item, onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isClicked, setIsClicked] = useState(false);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsClicked(true);
+    setIsHovered(false);
+    onClick();
+    setTimeout(() => setIsClicked(false), 100);
+  };
+
+  return (
+    <div
+      className="cursor-pointer relative"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* 기본 상태 */}
+      <div onClick={handleClick}>
+        <div className="relative aspect-video overflow-hidden rounded-lg">
+          <img
+            src={
+              item.thumbnailUrl ||
+              "https://via.placeholder.com/400x225?text=No+Image"
+            }
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+            <div
+              className="h-full bg-primary"
+              style={{ width: `${Math.min(item.progressPercent, 100)}%` }}
+            />
+          </div>
+        </div>
+        <h3 className="font-semibold text-base mt-2 line-clamp-1">
+          {item.title}
+          {item.episodeTitle && (
+            <span className="text-gray-400 font-normal text-sm">
+              {" "}
+              · {item.episodeNumber}화
+            </span>
+          )}
+        </h3>
+      </div>
+
+      {/* 호버 시 확대 카드 */}
+      <div
+        onClick={handleClick}
+        className="absolute top-1/2 left-1/2 w-full bg-gray-900 rounded-lg shadow-2xl border border-gray-800"
+        style={{
+          transform: isHovered
+            ? "translate(-50%, -50%) scale(1.2)"
+            : "translate(-50%, -50%) scale(1)",
+          opacity: isHovered ? 1 : 0,
+          transition: isClicked ? "none" : "all 0.3s ease-out",
+          zIndex: isHovered ? 100 : -1,
+          pointerEvents: isHovered ? "auto" : "none",
+        }}
+      >
+        <div className="relative aspect-video overflow-hidden rounded-t-lg">
+          <img
+            src={
+              item.thumbnailUrl ||
+              "https://via.placeholder.com/400x225?text=No+Image"
+            }
+            alt={item.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gray-700">
+            <div
+              className="h-full bg-primary"
+              style={{ width: `${Math.min(item.progressPercent, 100)}%` }}
+            />
+          </div>
+        </div>
+        <div className="p-4">
+          <h3 className="font-semibold text-lg mb-2 line-clamp-1">
+            {item.title}
+          </h3>
+          {item.episodeTitle && (
+            <p className="text-sm text-gray-400 mb-2">
+              {item.episodeNumber}화 · {item.episodeTitle}
+            </p>
+          )}
+          <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatTime(item.lastPosition)} / {formatTime(item.duration)}
+            </span>
+            <span>{item.progressPercent}% 시청</span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClick(e);
+            }}
+            className="w-full bg-white text-black px-4 py-2 rounded font-semibold hover:bg-gray-200 transition-colors text-sm flex items-center justify-center gap-2"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            이어서 재생
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const HomePage: React.FC = () => {
   const { user } = useAuth();
@@ -21,7 +146,9 @@ const HomePage: React.FC = () => {
   const [popularContents, setPopularContents] = useState<Content[]>([]);
   const [recommendedContents, setRecommendedContents] = useState<Content[]>([]);
   const [originalContents, setOriginalContents] = useState<Content[]>([]);
-  const [continueWatching, setContinueWatching] = useState<Content[]>([]);
+  const [continueWatching, setContinueWatching] = useState<WatchHistoryItem[]>(
+    [],
+  );
   const [bookmarkedContents, setBookmarkedContents] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
@@ -67,10 +194,20 @@ const HomePage: React.FC = () => {
         }
       }
 
-      // 이어보기
+      // 이어보기 (시청 이력 API로 진행률 포함)
       if (user) {
-        const watching = await contentService.getWatchingContentList();
-        setContinueWatching(watching);
+        try {
+          const historyData = await historyService.getWatchHistory(
+            undefined,
+            5,
+          );
+          setContinueWatching(
+            historyData.watchHistory.filter((h) => h.status !== "COMPLETED"),
+          );
+        } catch (error) {
+          console.error("시청 이력 조회 실패:", error);
+          setContinueWatching([]);
+        }
 
         // 찜 목록
         const bookmarks = await contentService.getBookmarkList();
@@ -181,11 +318,15 @@ const HomePage: React.FC = () => {
               <h2 className="text-2xl font-bold">이어서 시청하기</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {continueWatching.map((content) => (
-                <ContentCard
-                  key={content.id}
-                  content={content}
-                  onCardClick={setSelectedContent}
+              {continueWatching.map((item) => (
+                <WatchingCard
+                  key={item.historyId}
+                  item={item}
+                  onClick={() =>
+                    navigate(
+                      `/content/${item.contentId}${item.episodeId ? `?episode=${item.episodeId}` : ""}`,
+                    )
+                  }
                 />
               ))}
             </div>

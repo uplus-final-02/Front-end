@@ -7,11 +7,18 @@ import {
   BarChart3,
   Settings,
   Camera,
+  Trash2,
+  Play,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
 import { authService } from "@/services/authService";
 import { bookmarkService } from "@/services/bookmarkService";
+import {
+  historyService,
+  type WatchHistoryItem,
+} from "@/services/historyService";
 import type { Profile } from "@/types/profile";
 import type { BookmarkItem } from "@/types/bookmark";
 import ContentCard from "@/components/content/ContentCard";
@@ -50,6 +57,12 @@ const MyPage: React.FC = () => {
   // 콘텐츠 모달
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
 
+  // 시청 이력
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<number | null>(null);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   useEffect(() => {
     // AuthContext 로딩 중이면 대기
     if (authLoading) return;
@@ -65,6 +78,9 @@ const MyPage: React.FC = () => {
   useEffect(() => {
     if (activeTab === "bookmarks" && user) {
       loadBookmarks();
+    }
+    if (activeTab === "history" && user) {
+      loadWatchHistory();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, user]);
@@ -106,11 +122,38 @@ const MyPage: React.FC = () => {
   const handleBookmarkRemove = async (contentId: string) => {
     try {
       await bookmarkService.removeBookmark(parseInt(contentId));
-      // 북마크 목록 새로고침
       loadBookmarks();
     } catch (error) {
       console.error("북마크 삭제 실패:", error);
       alert("북마크 삭제에 실패했습니다.");
+    }
+  };
+
+  const loadWatchHistory = async (cursor?: number) => {
+    setHistoryLoading(true);
+    try {
+      const data = await historyService.getWatchHistory(cursor, 20);
+      if (cursor) {
+        setWatchHistory((prev) => [...prev, ...data.watchHistory]);
+      } else {
+        setWatchHistory(data.watchHistory);
+      }
+      setHistoryCursor(data.nextCursor ? parseInt(data.nextCursor) : null);
+      setHasMoreHistory(data.hasNext);
+    } catch (error) {
+      console.error("시청 이력 조회 실패:", error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleDeleteHistory = async (historyId: number) => {
+    try {
+      await historyService.deleteWatchHistory(historyId);
+      setWatchHistory((prev) => prev.filter((h) => h.historyId !== historyId));
+    } catch (error) {
+      console.error("시청 이력 삭제 실패:", error);
+      alert("시청 이력 삭제에 실패했습니다.");
     }
   };
 
@@ -249,6 +292,13 @@ const MyPage: React.FC = () => {
   }
 
   if (!user || !profile) return null;
+
+  const formatDuration = (seconds: number) => {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   return (
     <div className="min-h-screen bg-dark">
@@ -553,12 +603,137 @@ const MyPage: React.FC = () => {
         {/* 시청 이력 탭 */}
         {activeTab === "history" && (
           <div className="max-w-5xl mx-auto">
-            <div className="text-center py-12">
-              <History className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">
-                시청 이력 기능은 추후 구현 예정입니다.
-              </p>
-            </div>
+            {historyLoading && watchHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+              </div>
+            ) : watchHistory.length === 0 ? (
+              <div className="text-center py-12">
+                <History className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400 mb-4">시청 이력이 없습니다.</p>
+                <button onClick={() => navigate("/")} className="btn-primary">
+                  콘텐츠 둘러보기
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {watchHistory.map((item) => (
+                    <div
+                      key={item.historyId}
+                      className="bg-gray-900 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-800/80 transition-colors"
+                    >
+                      <div
+                        className="relative flex-shrink-0 cursor-pointer group"
+                        onClick={() =>
+                          navigate(
+                            `/content/${item.contentId}${item.episodeId ? `?episode=${item.episodeId}` : ""}`,
+                          )
+                        }
+                      >
+                        <img
+                          src={
+                            item.thumbnailUrl ||
+                            "https://via.placeholder.com/160x90?text=No+Image"
+                          }
+                          alt={item.title}
+                          className="w-40 h-[90px] object-cover rounded"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                          <Play className="w-8 h-8 fill-current" />
+                        </div>
+                        {item.duration > 0 && (
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+                            <div
+                              className="h-full bg-primary"
+                              style={{
+                                width: `${Math.min(item.progressPercent, 100)}%`,
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() =>
+                          navigate(
+                            `/content/${item.contentId}${item.episodeId ? `?episode=${item.episodeId}` : ""}`,
+                          )
+                        }
+                      >
+                        <h3 className="font-semibold text-base line-clamp-1 mb-1">
+                          {item.title}
+                          {item.episodeTitle && (
+                            <span className="text-gray-400 font-normal">
+                              {" "}
+                              · {item.episodeNumber}화 {item.episodeTitle}
+                            </span>
+                          )}
+                        </h3>
+                        <div className="flex items-center gap-3 text-sm text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            {formatDuration(item.lastPosition)} /{" "}
+                            {formatDuration(item.duration)}
+                          </span>
+                          <span>{item.progressPercent}% 시청</span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-xs ${
+                              item.status === "COMPLETED"
+                                ? "bg-green-500/20 text-green-400"
+                                : item.status === "WATCHING"
+                                  ? "bg-blue-500/20 text-blue-400"
+                                  : "bg-gray-700 text-gray-400"
+                            }`}
+                          >
+                            {item.status === "COMPLETED"
+                              ? "시청 완료"
+                              : item.status === "WATCHING"
+                                ? "시청 중"
+                                : "시작됨"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(item.watchedAt).toLocaleDateString(
+                            "ko-KR",
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteHistory(item.historyId)}
+                        className="flex-shrink-0 p-2 text-gray-500 hover:text-red-400 transition-colors"
+                        title="시청 이력 삭제"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {hasMoreHistory && (
+                  <div className="text-center mt-8">
+                    <button
+                      onClick={() =>
+                        loadWatchHistory(historyCursor ?? undefined)
+                      }
+                      disabled={historyLoading}
+                      className="btn-secondary"
+                    >
+                      {historyLoading ? "로딩 중..." : "더보기"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

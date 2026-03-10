@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface VideoPlayerProps {
   videoUrl: string;
-  onTimeUpdate?: (currentTime: number) => void;
+  onTimeUpdate?: (currentTime: number, playDurationSec: number) => void;
   startTime?: number;
   autoPlay?: boolean;
 }
@@ -34,12 +34,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
 
+  // 누적 재생 시간 추적 (실제로 재생된 시간)
+  const playDurationRef = useRef(0);
+  const playingRef = useRef(false);
+
   // 구독 여부에 따른 제한
   const canUseSpeedControl = user?.subscriptionType !== "none";
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    // videoUrl 변경 시 누적 재생 시간 리셋
+    playDurationRef.current = 0;
 
     if (Hls.isSupported()) {
       const hls = new Hls();
@@ -69,16 +76,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [videoUrl, startTime, autoPlay]);
 
+  // 누적 재생 시간 계산을 위한 인터벌
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (playingRef.current) {
+        playDurationRef.current += 1;
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const togglePlay = () => {
     const video = videoRef.current;
     if (!video) return;
 
     if (video.paused) {
       video.play();
-      setIsPlaying(true);
     } else {
       video.pause();
-      setIsPlaying(false);
     }
   };
 
@@ -88,8 +103,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     setCurrentTime(video.currentTime);
     if (onTimeUpdate) {
-      onTimeUpdate(video.currentTime);
+      onTimeUpdate(video.currentTime, playDurationRef.current);
     }
+  };
+
+  const handlePlay = () => {
+    setIsPlaying(true);
+    playingRef.current = true;
+  };
+
+  const handlePause = () => {
+    setIsPlaying(false);
+    playingRef.current = false;
   };
 
   const handleLoadedMetadata = () => {
@@ -120,7 +145,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const toggleMute = () => {
     const video = videoRef.current;
     if (!video) return;
-
     video.muted = !video.muted;
     setIsMuted(!isMuted);
   };
@@ -128,7 +152,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const changePlaybackRate = (rate: number) => {
     const video = videoRef.current;
     if (!video || !canUseSpeedControl) return;
-
     video.playbackRate = rate;
     setPlaybackRate(rate);
     setShowSettings(false);
@@ -137,7 +160,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const toggleFullscreen = () => {
     const video = videoRef.current;
     if (!video) return;
-
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
@@ -162,6 +184,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         className="w-full aspect-video"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onPlay={handlePlay}
+        onPause={handlePause}
         onClick={togglePlay}
       />
 
@@ -183,7 +207,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            {/* 재생/일시정지 */}
             <button
               onClick={togglePlay}
               className="hover:text-primary transition-colors"
@@ -195,7 +218,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
               )}
             </button>
 
-            {/* 볼륨 */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={toggleMute}
@@ -218,20 +240,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
               />
             </div>
 
-            {/* 시간 */}
             <span className="text-sm">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* 배속 설정 */}
             <div className="relative">
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className={`hover:text-primary transition-colors ${
-                  !canUseSpeedControl ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className={`hover:text-primary transition-colors ${!canUseSpeedControl ? "opacity-50 cursor-not-allowed" : ""}`}
                 disabled={!canUseSpeedControl}
               >
                 <Settings className="w-5 h-5" />
@@ -244,9 +262,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     <button
                       key={rate}
                       onClick={() => changePlaybackRate(rate)}
-                      className={`block w-full text-left px-3 py-2 rounded hover:bg-gray-800 transition-colors ${
-                        playbackRate === rate ? "text-primary" : ""
-                      }`}
+                      className={`block w-full text-left px-3 py-2 rounded hover:bg-gray-800 transition-colors ${playbackRate === rate ? "text-primary" : ""}`}
                     >
                       {rate}x
                     </button>
@@ -255,7 +271,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
               )}
             </div>
 
-            {/* 전체화면 */}
             <button
               onClick={toggleFullscreen}
               className="hover:text-primary transition-colors"
@@ -265,7 +280,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </div>
         </div>
 
-        {/* 구독 안내 */}
         {!canUseSpeedControl && (
           <div className="mt-2 text-xs text-gray-400">
             배속 재생은 구독 회원만 이용 가능합니다

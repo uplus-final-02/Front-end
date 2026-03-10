@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   User,
   Bookmark,
@@ -23,9 +23,18 @@ type Tab = "profile" | "bookmarks" | "history" | "stats";
 const MyPage: React.FC = () => {
   const { user, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<Tab>("profile");
+  // URL 쿼리 파라미터에서 탭 읽기
+  const tabParam = searchParams.get("tab") as Tab | null;
+  const [activeTab, setActiveTab] = useState<Tab>(tabParam || "profile");
+
+  // 탭 변경 시 URL 업데이트
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -162,11 +171,51 @@ const MyPage: React.FC = () => {
     }
   };
 
+  const [imageUploading, setImageUploading] = useState(false);
+
   const handleImageUpload = async (
-    _event: React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    // 프로필 이미지 업로드는 백엔드 API 배포 후 활성화 예정
-    alert("프로필 이미지 업로드 기능은 백엔드 API 배포 후 사용 가능합니다.");
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // 파일 크기 제한 (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("이미지 크기는 5MB 이하만 가능합니다.");
+      return;
+    }
+
+    // 확장자 추출
+    const extension =
+      "." + (file.name.split(".").pop()?.toLowerCase() || "png");
+    if (![".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(extension)) {
+      alert("jpg, png, gif, webp 형식만 지원합니다.");
+      return;
+    }
+
+    setImageUploading(true);
+    try {
+      // 1. Presigned URL 발급
+      const { uploadUrl, objectKey, contentType } =
+        await profileService.getPresignedUrl(extension);
+
+      // 2. S3에 이미지 업로드 (서명된 Content-Type과 일치시켜야 함)
+      await profileService.uploadImageToS3(uploadUrl, file, contentType);
+
+      // 3. 백엔드에 objectKey 저장
+      await profileService.updateProfileImage({ objectKey });
+
+      // 4. 프로필 새로고침
+      await loadProfile();
+      alert("프로필 이미지가 변경되었습니다.");
+    } catch (error: any) {
+      console.error("프로필 이미지 업로드 실패:", error);
+      alert(error.response?.data?.message || "이미지 업로드에 실패했습니다.");
+    } finally {
+      setImageUploading(false);
+      // input 초기화 (같은 파일 재선택 가능하도록)
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -209,7 +258,7 @@ const MyPage: React.FC = () => {
         {/* 탭 네비게이션 */}
         <div className="flex space-x-4 mb-8 border-b border-gray-800">
           <button
-            onClick={() => setActiveTab("profile")}
+            onClick={() => handleTabChange("profile")}
             className={`pb-4 px-4 transition-colors ${
               activeTab === "profile"
                 ? "border-b-2 border-primary text-primary"
@@ -220,7 +269,7 @@ const MyPage: React.FC = () => {
             프로필
           </button>
           <button
-            onClick={() => setActiveTab("bookmarks")}
+            onClick={() => handleTabChange("bookmarks")}
             className={`pb-4 px-4 transition-colors ${
               activeTab === "bookmarks"
                 ? "border-b-2 border-primary text-primary"
@@ -231,7 +280,7 @@ const MyPage: React.FC = () => {
             찜한 콘텐츠
           </button>
           <button
-            onClick={() => setActiveTab("history")}
+            onClick={() => handleTabChange("history")}
             className={`pb-4 px-4 transition-colors ${
               activeTab === "history"
                 ? "border-b-2 border-primary text-primary"
@@ -242,7 +291,7 @@ const MyPage: React.FC = () => {
             시청 이력
           </button>
           <button
-            onClick={() => setActiveTab("stats")}
+            onClick={() => handleTabChange("stats")}
             className={`pb-4 px-4 transition-colors ${
               activeTab === "stats"
                 ? "border-b-2 border-primary text-primary"
@@ -308,16 +357,20 @@ const MyPage: React.FC = () => {
                     )}
                   </div>
                   <button
-                    onClick={() =>
-                      alert(
-                        "프로필 이미지 업로드 기능은 백엔드 API 배포 후 사용 가능합니다.",
-                      )
-                    }
-                    disabled={true}
-                    className="absolute bottom-0 right-0 bg-gray-600 p-2 rounded-full cursor-not-allowed opacity-50"
-                    title="준비 중"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={imageUploading}
+                    className={`absolute bottom-0 right-0 p-2 rounded-full transition-colors ${
+                      imageUploading
+                        ? "bg-gray-600 cursor-not-allowed opacity-50"
+                        : "bg-primary hover:bg-primary/80 cursor-pointer"
+                    }`}
+                    title="프로필 이미지 변경"
                   >
-                    <Camera className="w-5 h-5" />
+                    {imageUploading ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Camera className="w-5 h-5" />
+                    )}
                   </button>
                   <input
                     ref={fileInputRef}
@@ -325,7 +378,6 @@ const MyPage: React.FC = () => {
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="hidden"
-                    disabled
                   />
                 </div>
               </div>

@@ -21,6 +21,92 @@ const mockContents: Content[] = [
 ];
 
 export const contentService = {
+  // 실시간 인기 차트 조회
+  getTrendingContents: async (limit: number = 10): Promise<Content[]> => {
+    if (USE_MOCK) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return mockContents.slice(0, limit);
+    }
+
+    try {
+      const response = await apiClient.get("/api/contents/home/trending", {
+        params: { limit },
+      });
+
+      return response.data.data.map((item: any) => ({
+        id: item.content.contentId.toString(),
+        title: item.content.title,
+        thumbnail: item.content.thumbnailUrl,
+        thumbnailUrl: item.content.thumbnailUrl,
+        type: item.content.type === "SINGLE" ? "movie" : "series",
+        category: item.content.tags[0]?.name || "기타",
+        tags: item.content.tags.map((tag: any) => tag.name),
+        rating: 0,
+        year: new Date(item.content.createdAt).getFullYear(),
+        duration: item.content.type === "SINGLE" ? "미정" : "시리즈",
+        description:
+          item.content.description?.summary ||
+          item.content.description?.description ||
+          "",
+        accessLevel: item.content.accessLevel,
+        bookmarkCount: item.content.bookmarkCount,
+        viewCount: item.content.totalViewCount,
+        rank: item.rank,
+        trendingScore: item.trendingScore,
+      }));
+    } catch (error) {
+      console.error("인기 차트 조회 실패:", error);
+      return [];
+    }
+  },
+
+  // 추천 콘텐츠 조회
+  getRecommendedContents: async (
+    extended: boolean = false,
+  ): Promise<{
+    items: Content[];
+    hasMore: boolean;
+  }> => {
+    if (USE_MOCK) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return {
+        items: mockContents.slice(0, extended ? 50 : 15),
+        hasMore: !extended,
+      };
+    }
+
+    try {
+      const response = await apiClient.get("/api/contents/recommended", {
+        params: { extended },
+      });
+
+      const items = response.data.data.items.map((item: any) => ({
+        id: item.contentId.toString(),
+        title: item.title,
+        thumbnail: item.thumbnailUrl,
+        thumbnailUrl: item.thumbnailUrl,
+        type: item.contentType === "SINGLE" ? "movie" : "series",
+        category: item.tags[0] || "기타",
+        tags: item.tags,
+        rating: 0,
+        year: new Date().getFullYear(),
+        duration: item.contentType === "SINGLE" ? "미정" : "시리즈",
+        description: "",
+        accessLevel: item.accessLevel,
+        bookmarkCount: item.bookmarkCount,
+        viewCount: item.totalViewCount,
+      }));
+
+      return {
+        items,
+        hasMore: response.data.data.hasMore,
+      };
+    } catch (error) {
+      console.error("추천 콘텐츠 조회 실패:", error);
+      return { items: [], hasMore: false };
+    }
+  },
+
   // 기본 콘텐츠 목록 조회
   getDefaultContentList: async (params?: {
     uploaderType?: string;

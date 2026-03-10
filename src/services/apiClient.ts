@@ -13,7 +13,6 @@ export const apiClient = axios.create({
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true", // ngrok 브라우저 경고 건너뛰기
   },
 });
 

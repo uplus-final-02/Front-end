@@ -59,7 +59,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     playDurationRef.current = 0;
 
     if (Hls.isSupported()) {
-      const hls = new Hls();
+      const hls = new Hls({
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true; // 쿠키 포함
+        },
+      });
       hls.loadSource(videoUrl);
       hls.attachMedia(video);
 

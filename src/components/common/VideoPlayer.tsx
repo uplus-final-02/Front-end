@@ -17,6 +17,7 @@ interface VideoPlayerProps {
   onTimeUpdate?: (currentTime: number, playDurationSec: number) => void;
   onToggleComments?: () => void;
   onToggleFullscreen?: () => void;
+  onEnded?: () => void;
   isCommentOpen?: boolean;
   isFullscreen?: boolean;
   startTime?: number;
@@ -28,6 +29,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onTimeUpdate,
   onToggleComments,
   onToggleFullscreen,
+  onEnded,
   isCommentOpen = false,
   isFullscreen = false,
   startTime = 0,
@@ -192,6 +194,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onLoadedMetadata={handleLoadedMetadata}
         onPlay={handlePlay}
         onPause={handlePause}
+        onEnded={onEnded}
         onClick={togglePlay}
       />
 

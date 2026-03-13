@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
 import { authService } from "@/services/authService";
 import { bookmarkService } from "@/services/bookmarkService";
+import type { BookmarkItem, PlaylistItem } from "@/types/bookmark";
 import {
   historyService,
   type WatchHistoryItem,
@@ -30,8 +31,8 @@ import {
   type SubscriptionInfo,
 } from "@/services/subscriptionService";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import VideoPlayer from "@/components/common/VideoPlayer";
 import type { Profile } from "@/types/profile";
-import type { BookmarkItem } from "@/types/bookmark";
 import ContentCard from "@/components/content/ContentCard";
 import ContentModal from "@/components/content/ContentModal";
 import type { Content } from "@/types";
@@ -67,6 +68,12 @@ const MyPage: React.FC = () => {
 
   // 콘텐츠 모달
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+
+  // 플레이리스트 연속 재생
+  const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
+  const [playlistIndex, setPlaylistIndex] = useState(0);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [playlistLoading, setPlaylistLoading] = useState(false);
 
   // 시청 이력
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
@@ -165,6 +172,37 @@ const MyPage: React.FC = () => {
       alert("북마크 삭제에 실패했습니다.");
     }
   };
+
+  // === 플레이리스트 연속 재생 ===
+  const startPlaylist = async () => {
+    setPlaylistLoading(true);
+    try {
+      const data = await bookmarkService.getBookmarkPlaylist();
+      if (data.playlist.length === 0) {
+        alert("재생할 콘텐츠가 없습니다.");
+        return;
+      }
+      setPlaylist(data.playlist);
+      setPlaylistIndex(0);
+      setShowPlaylist(true);
+    } catch (error) {
+      console.error("플레이리스트 조회 실패:", error);
+      alert("플레이리스트를 불러오는데 실패했습니다.");
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  const handlePlaylistNext = () => {
+    if (playlistIndex < playlist.length - 1) {
+      setPlaylistIndex((prev) => prev + 1);
+    } else {
+      // 마지막 영상 끝 → 플레이리스트 종료
+      setShowPlaylist(false);
+    }
+  };
+
+  const currentPlaylistItem = playlist[playlistIndex] || null;
 
   const loadWatchHistory = async (cursor?: number) => {
     setHistoryLoading(true);
@@ -835,6 +873,22 @@ const MyPage: React.FC = () => {
               </div>
             ) : (
               <>
+                {/* 연속 재생 버튼 */}
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={startPlaylist}
+                    disabled={playlistLoading}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    {playlistLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                    연속 재생
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                   {bookmarks.map((bookmark) => (
                     <ContentCard
@@ -1350,6 +1404,94 @@ const MyPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* 플레이리스트 연속 재생 모달 */}
+      {showPlaylist && currentPlaylistItem && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
+          {/* 상단 바 */}
+          <div className="flex items-center justify-between px-6 py-3 bg-gray-900/80">
+            <div className="flex items-center gap-3 min-w-0">
+              <Play className="w-5 h-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">
+                  {currentPlaylistItem.title}
+                  {currentPlaylistItem.episodeTitle && (
+                    <span className="text-gray-400 font-normal">
+                      {" "}
+                      · {currentPlaylistItem.episodeTitle}
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {playlistIndex + 1} / {playlist.length}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowPlaylist(false)}
+              className="text-gray-400 hover:text-white transition-colors text-sm px-3 py-1"
+            >
+              닫기
+            </button>
+          </div>
+
+          {/* 비디오 플레이어 */}
+          <div className="flex-1 flex items-center justify-center">
+            <div className="w-full max-w-5xl">
+              <VideoPlayer
+                videoUrl={currentPlaylistItem.videoUrl || ""}
+                startTime={currentPlaylistItem.lastPosition}
+                autoPlay={true}
+                onEnded={handlePlaylistNext}
+              />
+            </div>
+          </div>
+
+          {/* 하단 플레이리스트 큐 */}
+          <div className="bg-gray-900/80 px-6 py-3">
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {playlist.map((item, idx) => (
+                <button
+                  key={`${item.contentId}-${item.episodeId ?? "s"}-${idx}`}
+                  onClick={() => setPlaylistIndex(idx)}
+                  className={`flex-shrink-0 w-48 rounded-lg overflow-hidden transition-all ${
+                    idx === playlistIndex
+                      ? "ring-2 ring-primary"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  <div className="relative">
+                    <img
+                      src={
+                        item.thumbnailUrl ||
+                        "https://via.placeholder.com/192x108?text=No+Image"
+                      }
+                      alt={item.title}
+                      className="w-full h-[108px] object-cover"
+                    />
+                    {item.progressPercent > 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+                        <div
+                          className="h-full bg-primary"
+                          style={{ width: `${item.progressPercent}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-2 bg-gray-800 text-left">
+                    <p className="text-xs truncate">{item.title}</p>
+                    {item.episodeTitle && (
+                      <p className="text-xs text-gray-500 truncate">
+                        {item.episodeTitle}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 콘텐츠 모달 */}
       {selectedContent && (

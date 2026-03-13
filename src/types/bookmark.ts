@@ -19,14 +19,14 @@ export interface BookmarkListResponse {
 }
 
 export interface PlaylistItem {
-  videoId: number;
+  order: number;
   contentId: number;
-  contentTitle: string;
-  thumbnailUrl: string;
-  duration: number;
   episodeId: number | null;
+  title: string;
   episodeTitle: string | null;
-  episodeNo: number | null;
+  thumbnailUrl: string;
+  videoUrl: string;
+  duration: number;
   lastPosition: number;
   progressPercent: number;
 }

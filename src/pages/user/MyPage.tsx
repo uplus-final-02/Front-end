@@ -83,6 +83,12 @@ const MyPage: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<string | null>(null);
 
+  // 선호 태그 편집
+  const [editingTags, setEditingTags] = useState(false);
+  const [allTags, setAllTags] = useState<{ tagId: number; name: string }[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
+  const [savingTags, setSavingTags] = useState(false);
+
   useEffect(() => {
     // AuthContext 로딩 중이면 대기
     if (authLoading) return;
@@ -377,6 +383,48 @@ const MyPage: React.FC = () => {
     }
   };
 
+  // === 선호 태그 편집 함수 ===
+  const startEditTags = async () => {
+    try {
+      const tags = await profileService.getAllTags();
+      setAllTags(tags);
+      setSelectedTagIds(
+        new Set(profile?.preferredTags.map((t) => t.tagId) || []),
+      );
+      setEditingTags(true);
+    } catch (error) {
+      console.error("태그 목록 조회 실패:", error);
+      alert("태그 목록을 불러오는데 실패했습니다.");
+    }
+  };
+
+  const toggleTag = (tagId: number) => {
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagId)) {
+        next.delete(tagId);
+      } else {
+        if (next.size >= 5) return prev;
+        next.add(tagId);
+      }
+      return next;
+    });
+  };
+
+  const savePreferredTags = async () => {
+    setSavingTags(true);
+    try {
+      await profileService.updatePreferredTags(Array.from(selectedTagIds));
+      await loadProfile();
+      setEditingTags(false);
+    } catch (error: any) {
+      console.error("선호 태그 저장 실패:", error);
+      alert(error.response?.data?.message || "선호 태그 저장에 실패했습니다.");
+    } finally {
+      setSavingTags(false);
+    }
+  };
+
   const subIsPaid = subInfo?.paid === true;
   const subIsUplus = user?.isLGUPlus === true;
   const subIsCanceled = subInfo?.subscriptionStatus === "CANCELED";
@@ -643,17 +691,76 @@ const MyPage: React.FC = () => {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400 mb-2">선호 태그</p>
-                    <div className="flex flex-wrap gap-2">
-                      {profile.preferredTags.map((tag) => (
-                        <span
-                          key={tag.tagId}
-                          className="bg-primary px-3 py-1 rounded-full text-sm"
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-gray-400">선호 태그</p>
+                      {!editingTags && (
+                        <button
+                          onClick={startEditTags}
+                          className="text-xs text-primary hover:text-primary/80 transition-colors"
                         >
-                          {tag.name}
-                        </span>
-                      ))}
+                          편집
+                        </button>
+                      )}
                     </div>
+                    {editingTags ? (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {selectedTagIds.size}개 선택됨 (최대 5개)
+                        </p>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {allTags.map((tag) => (
+                            <button
+                              key={tag.tagId}
+                              onClick={() => toggleTag(tag.tagId)}
+                              className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                                selectedTagIds.has(tag.tagId)
+                                  ? "bg-primary text-white"
+                                  : selectedTagIds.size >= 5
+                                    ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                                    : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                              }`}
+                            >
+                              {tag.name}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={savePreferredTags}
+                            disabled={savingTags}
+                            className="btn-primary text-sm px-4 py-1.5 disabled:opacity-50 flex items-center gap-1"
+                          >
+                            {savingTags && (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            )}
+                            저장
+                          </button>
+                          <button
+                            onClick={() => setEditingTags(false)}
+                            className="btn-secondary text-sm px-4 py-1.5"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {profile.preferredTags.length > 0 ? (
+                          profile.preferredTags.map((tag) => (
+                            <span
+                              key={tag.tagId}
+                              className="bg-primary px-3 py-1 rounded-full text-sm"
+                            >
+                              {tag.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-500 text-sm">
+                            선호 태그가 없습니다. 편집을 눌러 추가해보세요.
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-gray-400">가입일</p>

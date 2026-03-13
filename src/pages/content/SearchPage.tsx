@@ -1,99 +1,182 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { Content } from "@/types";
-import { contentService } from "@/services/contentService";
-import { SYSTEM_TAGS } from "@/services/mockData";
+import { searchService, type SearchParams } from "@/services/searchService";
 import ContentCard from "@/components/content/ContentCard";
 import ContentModal from "@/components/content/ContentModal";
 
-type TabType = "all" | "original" | "creator";
+type SortType = "RELATED" | "LATEST" | "POPULAR";
+
+const PAGE_SIZE = 15;
 
 const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") || "";
+  const initialTag = searchParams.get("tag") || "";
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [results, setResults] = useState<Content[]>([]);
-  const [allContents, setAllContents] = useState<Content[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>("all");
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [sortType, setSortType] = useState<SortType>("RELATED");
+  const [selectedTag, setSelectedTag] = useState<string | null>(
+    initialTag || null,
+  );
+  const [hasNext, setHasNext] = useState(false);
+  const [page, setPage] = useState(0);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  // 자동완성
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestTimer = useRef<ReturnType<typeof setTimeout>>();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // 태그 목록 (API에서 가져오기)
+  const [allTags, setAllTags] = useState<{ tagId: number; name: string }[]>([]);
 
   useEffect(() => {
-    loadAllContents();
+    // 태그 목록 로드
+    const loadTags = async () => {
+      try {
+        const { profileService } = await import("@/services/profileService");
+        const tags = await profileService.getAllTags();
+        setAllTags(tags);
+      } catch {
+        // 실패 시 무시
+      }
+    };
+    loadTags();
   }, []);
 
+  // 검색 실행
+  const doSearch = useCallback(
+    async (
+      query: string,
+      tag: string | null,
+      sort: SortType,
+      pageNum: number,
+      append: boolean = false,
+    ) => {
+      const hasKeyword = query.trim().length > 0;
+      const hasTag = !!tag;
+      if (!hasKeyword && !hasTag) {
+        setResults([]);
+        setMessage("");
+        setHasNext(false);
+        return;
+      }
+
+      append ? setLoadingMore(true) : setLoading(true);
+      setError(null);
+      try {
+        const params: SearchParams = {
+          sort,
+          page: pageNum,
+          size: PAGE_SIZE,
+        };
+        if (hasKeyword) params.keyword = query.trim();
+        if (hasTag) params.tag = tag;
+
+        const data = await searchService.search(params);
+        setResults((prev) =>
+          append ? [...prev, ...data.contents] : data.contents,
+        );
+        setHasNext(data.hasNext);
+        setMessage(data.message);
+        setPage(pageNum);
+      } catch (error: any) {
+        console.error("검색 실패:", error);
+        if (!append) setResults([]);
+        if (error.response?.status === 500) {
+          setError(
+            "검색 서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
+          );
+        } else {
+          setError("검색 중 오류가 발생했습니다.");
+        }
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [],
+  );
+
+  // 초기 로드 & URL 파라미터 변경 시
   useEffect(() => {
-    if (initialQuery) {
-      performSearch(initialQuery);
+    if (initialQuery || initialTag) {
+      doSearch(initialQuery, initialTag || null, sortType, 0);
     }
-  }, [initialQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery, initialTag]);
 
-  const loadAllContents = async () => {
-    try {
-      const contents = await contentService.getDefaultContentList();
-      setAllContents(contents);
-    } catch (error) {
-      console.error("콘텐츠 로딩 실패:", error);
-    }
+  // 정렬 변경 시 재검색
+  const handleSortChange = (sort: SortType) => {
+    setSortType(sort);
+    doSearch(searchQuery, selectedTag, sort, 0);
   };
 
-  const performSearch = async (query: string) => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // 간단한 클라이언트 사이드 검색 (백엔드 검색 API 없음)
-      const filtered = allContents.filter(
-        (content) =>
-          content.title.toLowerCase().includes(query.toLowerCase()) ||
-          content.tags.some((tag) =>
-            tag.toLowerCase().includes(query.toLowerCase()),
-          ),
-      );
-      setResults(filtered);
-    } catch (error) {
-      console.error("검색 실패:", error);
-    } finally {
-      setLoading(false);
-    }
+  // 태그 클릭
+  const handleTagClick = (tagName: string | null) => {
+    setSelectedTag(tagName);
+    const params: Record<string, string> = {};
+    if (searchQuery.trim()) params.q = searchQuery;
+    if (tagName) params.tag = tagName;
+    setSearchParams(params);
+    doSearch(searchQuery, tagName, sortType, 0);
   };
 
+  // 검색 폼 제출
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      setSearchParams({ q: searchQuery });
-      performSearch(searchQuery);
-    }
+    setShowSuggestions(false);
+    const params: Record<string, string> = {};
+    if (searchQuery.trim()) params.q = searchQuery;
+    if (selectedTag) params.tag = selectedTag;
+    setSearchParams(params);
+    doSearch(searchQuery, selectedTag, sortType, 0);
   };
 
-  // 필터링된 콘텐츠
-  const getFilteredContents = () => {
-    const baseContents = searchQuery.trim() ? results : allContents;
-    let filtered = [...baseContents];
-
-    // 탭 필터링
-    if (activeTab === "original") {
-      filtered = filtered.filter((c) => c.type === "original");
-    } else if (activeTab === "creator") {
-      filtered = filtered.filter((c) => c.type === "creator");
-    }
-
-    // 태그 필터링
-    if (selectedTag) {
-      filtered = filtered.filter((c) => c.tags.includes(selectedTag));
-    }
-
-    return filtered;
+  // 더보기
+  const handleLoadMore = () => {
+    doSearch(searchQuery, selectedTag, sortType, page + 1, true);
   };
 
-  const filteredContents = getFilteredContents();
-  const hasSearchQuery = searchQuery.trim().length > 0;
+  // 자동완성 입력 핸들러
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    if (val.trim().length < 1) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    suggestTimer.current = setTimeout(async () => {
+      try {
+        const list = await searchService.getSuggestions(val);
+        setSuggestions(list);
+        setShowSuggestions(list.length > 0);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 200);
+  };
+
+  // 자동완성 항목 클릭
+  const handleSuggestionClick = (text: string) => {
+    setSearchQuery(text);
+    setShowSuggestions(false);
+    setSearchParams({ q: text, ...(selectedTag ? { tag: selectedTag } : {}) });
+    doSearch(text, selectedTag, sortType, 0);
+  };
+
+  const hasSearchQuery = searchQuery.trim().length > 0 || !!selectedTag;
 
   return (
     <div className="min-h-screen bg-dark">
@@ -102,10 +185,13 @@ const SearchPage: React.FC = () => {
         <div className="mb-8 flex justify-center">
           <form onSubmit={handleSearch} className="relative w-full max-w-2xl">
             <input
+              ref={inputRef}
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="제목, 태그, 크리에이터로 검색..."
+              onChange={handleInputChange}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="제목, 태그로 검색... (초성 검색 가능)"
               className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-12 pr-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
               autoFocus
             />
@@ -116,14 +202,31 @@ const SearchPage: React.FC = () => {
             >
               검색
             </button>
+
+            {/* 자동완성 드롭다운 */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg overflow-hidden z-50 shadow-lg">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onMouseDown={() => handleSuggestionClick(s)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-700 transition-colors text-sm flex items-center gap-2"
+                  >
+                    <Search className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    <span>{s}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
         </div>
 
         {/* 태그 필터 */}
-        <section className="mb-8">
+        <section className="mb-6">
           <div className="flex flex-wrap gap-2 justify-center">
             <button
-              onClick={() => setSelectedTag(null)}
+              onClick={() => handleTagClick(null)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 selectedTag === null
                   ? "bg-primary text-white"
@@ -132,85 +235,72 @@ const SearchPage: React.FC = () => {
             >
               전체
             </button>
-            {SYSTEM_TAGS.map((tag) => (
+            {allTags.map((tag) => (
               <button
-                key={tag}
-                onClick={() => setSelectedTag(tag)}
+                key={tag.tagId}
+                onClick={() => handleTagClick(tag.name)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedTag === tag
+                  selectedTag === tag.name
                     ? "bg-primary text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                 }`}
               >
-                #{tag}
+                #{tag.name}
               </button>
             ))}
           </div>
         </section>
 
-        {/* 탭 필터 */}
-        <section className="mb-6">
-          <div className="flex gap-4 border-b border-gray-800">
-            <button
-              onClick={() => setActiveTab("all")}
-              className={`px-4 py-2 font-medium transition-colors relative ${
-                activeTab === "all"
-                  ? "text-white"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              전체
-              {activeTab === "all" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("original")}
-              className={`px-4 py-2 font-medium transition-colors relative ${
-                activeTab === "original"
-                  ? "text-white"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              오리지널
-              {activeTab === "original" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("creator")}
-              className={`px-4 py-2 font-medium transition-colors relative ${
-                activeTab === "creator"
-                  ? "text-white"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              크리에이터
-              {activeTab === "creator" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-              )}
-            </button>
+        {/* 정렬 */}
+        <section className="mb-6 flex items-center justify-between">
+          {hasSearchQuery && (
+            <p className="text-gray-400 text-sm">
+              {message || `검색 결과 ${results.length}개`}
+            </p>
+          )}
+          <div className="flex gap-2 ml-auto">
+            {(["RELATED", "LATEST", "POPULAR"] as SortType[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => handleSortChange(s)}
+                className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                  sortType === s
+                    ? "bg-primary text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                }`}
+              >
+                {s === "RELATED"
+                  ? "관련도순"
+                  : s === "LATEST"
+                    ? "최신순"
+                    : "인기순"}
+              </button>
+            ))}
           </div>
         </section>
-
-        {/* 결과 헤더 */}
-        {hasSearchQuery && (
-          <div className="mb-6">
-            <p className="text-gray-400">
-              "{searchQuery}" 검색 결과 {filteredContents.length}개
-            </p>
-          </div>
-        )}
 
         {/* 콘텐츠 그리드 */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
-              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
               <p className="text-gray-400">검색 중...</p>
             </div>
           </div>
-        ) : filteredContents.length === 0 ? (
+        ) : error ? (
+          <div className="text-center py-20">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-red-400" />
+            </div>
+            <p className="text-red-400 mb-2">{error}</p>
+            <button
+              onClick={() => doSearch(searchQuery, selectedTag, sortType, 0)}
+              className="btn-secondary mt-4"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : results.length === 0 ? (
           <div className="text-center py-20">
             <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-xl text-gray-400 mb-2">
@@ -223,15 +313,30 @@ const SearchPage: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {filteredContents.map((content) => (
-              <ContentCard
-                key={content.id}
-                content={content}
-                onCardClick={setSelectedContent}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              {results.map((content) => (
+                <ContentCard
+                  key={content.id}
+                  content={content}
+                  onCardClick={setSelectedContent}
+                />
+              ))}
+            </div>
+
+            {hasNext && (
+              <div className="text-center mt-8">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="btn-secondary px-8 py-2.5 flex items-center gap-2 mx-auto"
+                >
+                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loadingMore ? "로딩 중..." : "더보기"}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

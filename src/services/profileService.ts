@@ -88,4 +88,21 @@ export const profileService = {
     const response = await apiClient.patch("/api/profile/image", request);
     return response.data.data;
   },
+
+  /**
+   * 전체 태그 목록 조회
+   */
+  getAllTags: async (): Promise<{ tagId: number; name: string }[]> => {
+    const response = await apiClient.get("/api/tags", {
+      params: { section: "LEVEL_0" },
+    });
+    return response.data.data;
+  },
+
+  /**
+   * 선호 태그 변경
+   */
+  updatePreferredTags: async (tagIds: number[]): Promise<void> => {
+    await apiClient.put("/api/users/me/preferred-tags", { tagIds });
+  },
 };

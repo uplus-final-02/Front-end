@@ -9,6 +9,11 @@ export type ContentStatus =
 export type AccessLevel = "FREE" | "BASIC" | "PREMIUM";
 export type UploaderType = "ORIGINAL" | "CREATOR";
 
+export interface Tag {
+  id: bigint;
+  name: string;
+}
+
 export interface Content {
   id: string;
   title: string;
@@ -61,7 +66,7 @@ export interface Episode {
 export interface WatchHistory {
   id: string;
   userId: string;
-  contentId: string;
+  contentId:string;
   episodeId?: string;
   lastPosition: number; // 초 단위
   watchedAt: string;

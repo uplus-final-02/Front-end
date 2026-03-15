@@ -21,9 +21,7 @@ const SearchPage: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
   const [sortType, setSortType] = useState<SortType>("RELATED");
-  const [selectedTag, setSelectedTag] = useState<string | null>(
-    initialTag || null,
-  );
+  const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
   const [hasNext, setHasNext] = useState(false);
   const [page, setPage] = useState(0);
   const [message, setMessage] = useState("");
@@ -56,7 +54,7 @@ const SearchPage: React.FC = () => {
   const doSearch = useCallback(
     async (
       query: string,
-      tag: string | null,
+      tag: string | undefined,
       sort: SortType,
       pageNum: number,
       append: boolean = false,
@@ -108,8 +106,10 @@ const SearchPage: React.FC = () => {
 
   // 초기 로드 & URL 파라미터 변경 시
   useEffect(() => {
+    // URL에 쿼리나 태그가 있을 때만 자동 검색
     if (initialQuery || initialTag) {
-      doSearch(initialQuery, initialTag || null, sortType, 0);
+      setSelectedTag(initialTag || undefined);
+      doSearch(initialQuery, initialTag || undefined, sortType, 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery, initialTag]);
@@ -121,11 +121,11 @@ const SearchPage: React.FC = () => {
   };
 
   // 태그 클릭
-  const handleTagClick = (tagName: string | null) => {
+  const handleTagClick = (tagName: string) => {
     setSelectedTag(tagName);
     const params: Record<string, string> = {};
     if (searchQuery.trim()) params.q = searchQuery;
-    if (tagName) params.tag = tagName;
+    params.tag = tagName;
     setSearchParams(params);
     doSearch(searchQuery, tagName, sortType, 0);
   };
@@ -176,7 +176,9 @@ const SearchPage: React.FC = () => {
     doSearch(text, selectedTag, sortType, 0);
   };
 
-  const hasSearchQuery = searchQuery.trim().length > 0 || !!selectedTag;
+  const hasSearchQuery =
+    searchQuery.trim().length > 0 ||
+    (selectedTag !== undefined && selectedTag !== null);
 
   return (
     <div className="min-h-screen bg-dark">
@@ -225,16 +227,6 @@ const SearchPage: React.FC = () => {
         {/* 태그 필터 */}
         <section className="mb-6">
           <div className="flex flex-wrap gap-2 justify-center">
-            <button
-              onClick={() => handleTagClick(null)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                selectedTag === null
-                  ? "bg-primary text-white"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-              }`}
-            >
-              전체
-            </button>
             {allTags.map((tag) => (
               <button
                 key={tag.tagId}

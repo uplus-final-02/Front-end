@@ -204,6 +204,26 @@ const ContentDetailPage: React.FC = () => {
         setPlayError("이 콘텐츠는 구독 회원만 시청할 수 있습니다.");
       } else if (status === 404) {
         setPlayError("영상 파일을 찾을 수 없습니다.");
+      } else if (status === 409) {
+        // 시청 이력 충돌 (soft-deleted 레코드 문제) - 재시도
+        console.warn("409 Conflict - 시청 이력 충돌, 재시도 중...");
+        try {
+          const retryInfo = await videoService.getPlayInfo(videoId);
+          setPlayInfo(retryInfo);
+          setIsBookmarked(retryInfo.isBookmarked);
+          try {
+            await videoService.increaseViewCount(videoId);
+          } catch {}
+          loadComments();
+          if (!retryInfo.url) {
+            setPlayError("현재 재생 가능한 영상이 없습니다.");
+          }
+          return;
+        } catch {
+          setPlayError(
+            "재생 정보를 불러오는 중 충돌이 발생했습니다. 잠시 후 다시 시도해주세요.",
+          );
+        }
       } else {
         setPlayError("재생 정보를 불러올 수 없습니다.");
       }

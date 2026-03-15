@@ -68,6 +68,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   const logout = () => {
     authService.logout();
     setUser(null);
+    // 홈으로 리다이렉트하여 페이지 새로고침
+    window.location.href = "/";
   };
 
   const updateUser = async (updates: Partial<User>) => {

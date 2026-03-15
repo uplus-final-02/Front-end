@@ -133,6 +133,14 @@ export const authService = {
           isLGUPlus: profile.isUPlusMember || false,
           paid: profile.subscriptionStatus === "SUBSCRIBED",
           joinDate: profile.createdAt,
+          role: (() => {
+            try {
+              const p = JSON.parse(atob(data.accessToken.split(".")[1]));
+              return p.role || "USER";
+            } catch {
+              return "USER";
+            }
+          })(),
         };
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
@@ -149,6 +157,14 @@ export const authService = {
           isLGUPlus: false,
           paid: false,
           joinDate: new Date().toISOString(),
+          role: (() => {
+            try {
+              const p = JSON.parse(atob(data.accessToken.split(".")[1]));
+              return p.role || "USER";
+            } catch {
+              return "USER";
+            }
+          })(),
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
         return user;
@@ -322,6 +338,7 @@ export const authService = {
             isLGUPlus: false,
             paid: false,
             joinDate: new Date().toISOString(),
+            role: payload.role || "USER",
           };
           localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
 
@@ -341,6 +358,7 @@ export const authService = {
             isLGUPlus: false,
             paid: false,
             joinDate: new Date().toISOString(),
+            role: "USER",
           };
           localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
 

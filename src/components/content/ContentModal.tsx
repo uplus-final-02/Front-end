@@ -1,14 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  X,
-  Play,
-  Bookmark,
-  Volume2,
-  VolumeX,
-  Info,
-  ChevronRight,
-} from "lucide-react";
+import { X, Play, Bookmark, Info, ChevronRight } from "lucide-react";
 import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
 import { bookmarkService } from "@/services/bookmarkService";
@@ -28,7 +20,6 @@ const ContentModal: React.FC<ContentModalProps> = ({
   const navigate = useNavigate();
   const [content, setContent] = useState<Content>(initialContent);
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
 
@@ -217,17 +208,6 @@ const ContentModal: React.FC<ContentModalProps> = ({
                 <Bookmark
                   className={`w-6 h-6 ${isBookmarked ? "fill-current" : ""}`}
                 />
-              </button>
-
-              <button
-                onClick={() => setIsMuted(!isMuted)}
-                className="w-12 h-12 flex items-center justify-center bg-gray-800/80 hover:bg-gray-700 rounded-full transition-colors ml-auto"
-              >
-                {isMuted ? (
-                  <VolumeX className="w-6 h-6" />
-                ) : (
-                  <Volume2 className="w-6 h-6" />
-                )}
               </button>
             </div>
           </div>

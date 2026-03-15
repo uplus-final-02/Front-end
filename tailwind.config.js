@@ -11,6 +11,9 @@ export default {
                 secondary: '#ffffff',
                 dark: '#141414',
             },
+            fontFamily: {
+                sans: ['S-CoreDream', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            },
         },
         colors: {
             // 기본 색상 유지

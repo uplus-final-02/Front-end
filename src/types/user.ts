@@ -12,6 +12,7 @@ export interface User {
   paid: boolean;
   joinDate: string;
   password?: string;
+  role?: string; // "USER" | "ADMIN"
 }
 
 export interface WatchStats {

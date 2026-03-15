@@ -1,3 +1,4 @@
+// AdminPage.tsx - 관리자 페이지 컴포넌트 
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Users,
@@ -11,7 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+
+
 import { adminService } from "@/services/adminService";
+import Statistics from "./Statistics";
 import type { AdminUser, AdminUserDetail } from "@/types";
 import {
   formatDate,
@@ -589,152 +593,7 @@ const ContentsManagement: React.FC<{
   );
 };
 
-// 통계/분석 컴포넌트
-const Statistics: React.FC = () => {
-  // Mock 데이터
-  const popularContents = [
-    {
-      rank: 1,
-      title: "인기 영화 1",
-      views: 15000,
-      bookmarks: 3200,
-      completionRate: 85,
-    },
-    {
-      rank: 2,
-      title: "인기 드라마 1",
-      views: 12000,
-      bookmarks: 2800,
-      completionRate: 78,
-    },
-    {
-      rank: 3,
-      title: "인기 영화 2",
-      views: 10000,
-      bookmarks: 2500,
-      completionRate: 82,
-    },
-  ];
 
-  const tagStats = [
-    { tag: "액션", count: 5000, percentage: 25 },
-    { tag: "드라마", count: 4000, percentage: 20 },
-    { tag: "코미디", count: 3500, percentage: 17.5 },
-    { tag: "스릴러", count: 3000, percentage: 15 },
-    { tag: "로맨스", count: 2500, percentage: 12.5 },
-  ];
 
-  return (
-    <div className="space-y-8">
-      {/* 인기 차트 */}
-      <div>
-        <h2 className="text-2xl font-bold mb-4">인기 콘텐츠 순위</h2>
-        <div className="bg-gray-900 rounded-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-800">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium">
-                  순위
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium">
-                  제목
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium">
-                  조회수
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium">
-                  찜하기
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-medium">
-                  완료율
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-800">
-              {popularContents.map((content) => (
-                <tr
-                  key={content.rank}
-                  className="hover:bg-gray-800/50 transition-colors"
-                >
-                  <td className="px-6 py-4 text-sm">
-                    <span className="flex items-center justify-center w-8 h-8 bg-primary rounded-full font-bold">
-                      {content.rank}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium">
-                    {content.title}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {content.views.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {content.bookmarks.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-800 rounded-full h-2 max-w-[100px]">
-                        <div
-                          className="bg-primary h-2 rounded-full"
-                          style={{ width: `${content.completionRate}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {content.completionRate}%
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 태그 통계 */}
-      <div>
-        <h2 className="text-2xl font-bold mb-4">선호 태그 통계</h2>
-        <div className="bg-gray-900 rounded-lg p-6">
-          <div className="space-y-4">
-            {tagStats.map((stat) => (
-              <div key={stat.tag}>
-                <div className="flex justify-between mb-2">
-                  <span className="font-medium">{stat.tag}</span>
-                  <span className="text-sm text-gray-400">
-                    {stat.count.toLocaleString()}회 ({stat.percentage}%)
-                  </span>
-                </div>
-                <div className="bg-gray-800 rounded-full h-3">
-                  <div
-                    className="bg-primary h-3 rounded-full transition-all"
-                    style={{ width: `${stat.percentage}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h3 className="text-gray-400 text-sm mb-2">전체 사용자</h3>
-          <p className="text-3xl font-bold">1,234</p>
-          <p className="text-sm text-green-400 mt-2">↑ 12% 지난주 대비</p>
-        </div>
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h3 className="text-gray-400 text-sm mb-2">전체 콘텐츠</h3>
-          <p className="text-3xl font-bold">567</p>
-          <p className="text-sm text-green-400 mt-2">↑ 8% 지난주 대비</p>
-        </div>
-        <div className="bg-gray-900 rounded-lg p-6">
-          <h3 className="text-gray-400 text-sm mb-2">총 시청 시간</h3>
-          <p className="text-3xl font-bold">45,678h</p>
-          <p className="text-sm text-green-400 mt-2">↑ 15% 지난주 대비</p>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default AdminPage;

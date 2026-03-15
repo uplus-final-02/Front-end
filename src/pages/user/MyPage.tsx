@@ -15,6 +15,7 @@ import {
   Phone,
   Shield,
   Loader2,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
@@ -31,6 +32,7 @@ import {
   type SubscriptionInfo,
 } from "@/services/subscriptionService";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import AlertModal from "@/components/common/AlertModal";
 import VideoPlayer from "@/components/common/VideoPlayer";
 import type { Profile } from "@/types/profile";
 import ContentCard from "@/components/content/ContentCard";
@@ -40,7 +42,7 @@ import type { Content } from "@/types";
 type Tab = "profile" | "bookmarks" | "history" | "stats" | "subscription";
 
 const MyPage: React.FC = () => {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +89,18 @@ const MyPage: React.FC = () => {
   const [subscribing, setSubscribing] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+    onClose?: () => void;
+  } | null>(null);
+  const showAlert = (
+    message: string,
+    type: "success" | "error" | "info" = "info",
+    onClose?: () => void,
+  ) => {
+    setAlertModal({ message, type, onClose });
+  };
   const [phoneNumber, setPhoneNumber] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<string | null>(null);
@@ -169,7 +183,7 @@ const MyPage: React.FC = () => {
       loadBookmarks();
     } catch (error) {
       console.error("북마크 삭제 실패:", error);
-      alert("북마크 삭제에 실패했습니다.");
+      showAlert("북마크 삭제에 실패했습니다.", "error");
     }
   };
 
@@ -179,7 +193,7 @@ const MyPage: React.FC = () => {
     try {
       const data = await bookmarkService.getBookmarkPlaylist();
       if (data.playlist.length === 0) {
-        alert("재생할 콘텐츠가 없습니다.");
+        showAlert("재생할 콘텐츠가 없습니다.", "info");
         return;
       }
       setPlaylist(data.playlist);
@@ -187,7 +201,7 @@ const MyPage: React.FC = () => {
       setShowPlaylist(true);
     } catch (error) {
       console.error("플레이리스트 조회 실패:", error);
-      alert("플레이리스트를 불러오는데 실패했습니다.");
+      showAlert("플레이리스트를 불러오는데 실패했습니다.", "error");
     } finally {
       setPlaylistLoading(false);
     }
@@ -228,7 +242,7 @@ const MyPage: React.FC = () => {
       setWatchHistory((prev) => prev.filter((h) => h.historyId !== historyId));
     } catch (error) {
       console.error("시청 이력 삭제 실패:", error);
-      alert("시청 이력 삭제에 실패했습니다.");
+      showAlert("시청 이력 삭제에 실패했습니다.", "error");
     }
   };
 
@@ -268,7 +282,7 @@ const MyPage: React.FC = () => {
 
   const handleSaveNickname = async () => {
     if (!profile || !nickname.trim()) {
-      alert("닉네임을 입력해주세요.");
+      showAlert("닉네임을 입력해주세요.", "info");
       return;
     }
 
@@ -276,7 +290,7 @@ const MyPage: React.FC = () => {
       await profileService.updateNickname(profile.userId, nickname);
       await loadProfile(); // 프로필 새로고침
       setEditMode(false);
-      alert("닉네임이 변경되었습니다.");
+      showAlert("닉네임이 변경되었습니다.", "success");
     } catch (error: any) {
       console.error("닉네임 변경 실패:", error);
 
@@ -285,7 +299,7 @@ const MyPage: React.FC = () => {
         error.response?.data?.message ||
         error.response?.data?.error ||
         "닉네임 변경에 실패했습니다.";
-      alert(errorMessage);
+      showAlert(errorMessage, "error");
     }
   };
 
@@ -299,7 +313,7 @@ const MyPage: React.FC = () => {
 
     // 파일 크기 제한 (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("이미지 크기는 5MB 이하만 가능합니다.");
+      showAlert("이미지 크기는 5MB 이하만 가능합니다.", "error");
       return;
     }
 
@@ -307,7 +321,7 @@ const MyPage: React.FC = () => {
     const extension =
       "." + (file.name.split(".").pop()?.toLowerCase() || "png");
     if (![".jpg", ".jpeg", ".png", ".gif", ".webp"].includes(extension)) {
-      alert("jpg, png, gif, webp 형식만 지원합니다.");
+      showAlert("jpg, png, gif, webp 형식만 지원합니다.", "error");
       return;
     }
 
@@ -325,10 +339,13 @@ const MyPage: React.FC = () => {
 
       // 4. 프로필 새로고침
       await loadProfile();
-      alert("프로필 이미지가 변경되었습니다.");
+      showAlert("프로필 이미지가 변경되었습니다.", "success");
     } catch (error: any) {
       console.error("프로필 이미지 업로드 실패:", error);
-      alert(error.response?.data?.message || "이미지 업로드에 실패했습니다.");
+      showAlert(
+        error.response?.data?.message || "이미지 업로드에 실패했습니다.",
+        "error",
+      );
     } finally {
       setImageUploading(false);
       // input 초기화 (같은 파일 재선택 가능하도록)
@@ -374,12 +391,14 @@ const MyPage: React.FC = () => {
     setSubscribing(true);
     try {
       await subscriptionService.subscribe("CARD");
-      alert("베이직 구독이 완료되었습니다!");
+      showAlert("베이직 구독이 완료되었습니다!", "success");
       await refreshAuth();
       loadSubscription();
+      loadProfile();
     } catch (error: any) {
-      alert(
+      showAlert(
         error.response?.data?.message || "구독 처리 중 오류가 발생했습니다.",
+        "error",
       );
     } finally {
       setSubscribing(false);
@@ -391,11 +410,18 @@ const MyPage: React.FC = () => {
     try {
       await subscriptionService.cancelSubscription();
       setShowCancelModal(false);
-      alert("구독 해지가 예약되었습니다. 만료일까지 이용 가능합니다.");
+      showAlert(
+        "구독 해지가 예약되었습니다. 만료일까지 이용 가능합니다.",
+        "success",
+      );
       await refreshAuth();
       loadSubscription();
+      loadProfile();
     } catch (error: any) {
-      alert(error.response?.data?.message || "구독 해지에 실패했습니다.");
+      showAlert(
+        error.response?.data?.message || "구독 해지에 실패했습니다.",
+        "error",
+      );
     } finally {
       setCanceling(false);
     }
@@ -403,12 +429,12 @@ const MyPage: React.FC = () => {
 
   const handleVerifyUplus = async () => {
     if (!phoneNumber.trim()) {
-      alert("전화번호를 입력해주세요.");
+      showAlert("전화번호를 입력해주세요.", "info");
       return;
     }
     const cleaned = phoneNumber.replace(/[^0-9]/g, "");
     if (cleaned.length < 10) {
-      alert("올바른 전화번호를 입력해주세요.");
+      showAlert("올바른 전화번호를 입력해주세요.", "info");
       return;
     }
     setVerifying(true);
@@ -419,12 +445,16 @@ const MyPage: React.FC = () => {
         setVerifyResult("success");
         await refreshAuth();
         loadSubscription();
+        loadProfile();
       } else {
         setVerifyResult("fail");
       }
     } catch (error: any) {
       setVerifyResult("fail");
-      alert(error.response?.data?.message || "인증에 실패했습니다.");
+      showAlert(
+        error.response?.data?.message || "인증에 실패했습니다.",
+        "error",
+      );
     } finally {
       setVerifying(false);
     }
@@ -444,6 +474,21 @@ const MyPage: React.FC = () => {
         const { accessToken, refreshToken: newRefresh } = response.data.data;
         localStorage.setItem("accessToken", accessToken);
         if (newRefresh) localStorage.setItem("refreshToken", newRefresh);
+
+        // 프로필 다시 조회해서 AuthContext 유저 정보 갱신
+        try {
+          const freshProfile = await profileService.getMyProfile();
+          await updateUser({
+            isLGUPlus: freshProfile.isUPlusMember || false,
+            paid: freshProfile.subscriptionStatus === "SUBSCRIBED",
+            subscriptionType:
+              freshProfile.subscriptionStatus === "SUBSCRIBED"
+                ? "basic"
+                : "none",
+          });
+        } catch {
+          // 프로필 조회 실패는 무시
+        }
       }
     } catch {
       // 재발급 실패는 무시
@@ -461,7 +506,7 @@ const MyPage: React.FC = () => {
       setEditingTags(true);
     } catch (error) {
       console.error("태그 목록 조회 실패:", error);
-      alert("태그 목록을 불러오는데 실패했습니다.");
+      showAlert("태그 목록을 불러오는데 실패했습니다.", "error");
     }
   };
 
@@ -486,14 +531,18 @@ const MyPage: React.FC = () => {
       setEditingTags(false);
     } catch (error: any) {
       console.error("선호 태그 저장 실패:", error);
-      alert(error.response?.data?.message || "선호 태그 저장에 실패했습니다.");
+      showAlert(
+        error.response?.data?.message || "선호 태그 저장에 실패했습니다.",
+        "error",
+      );
     } finally {
       setSavingTags(false);
     }
   };
 
   const subIsPaid = subInfo?.paid === true;
-  const subIsUplus = user?.isLGUPlus === true;
+  const subIsUplus =
+    user?.isLGUPlus === true || profile?.isUPlusMember === true;
   const subIsCanceled = subInfo?.subscriptionStatus === "CANCELED";
 
   const getMemberStatus = () => {
@@ -513,14 +562,14 @@ const MyPage: React.FC = () => {
       await authService.deleteAccount(profile.userId.toString());
       logout();
       navigate("/");
-      alert("회원 탈퇴가 완료되었습니다.");
+      showAlert("회원 탈퇴가 완료되었습니다.", "success");
     } catch (error: any) {
       console.error("회원 탈퇴 실패:", error);
       const errorMessage =
         error.response?.data?.message ||
         error.response?.data?.error ||
         "회원 탈퇴에 실패했습니다.";
-      alert(errorMessage);
+      showAlert(errorMessage, "error");
     }
   };
 
@@ -532,7 +581,23 @@ const MyPage: React.FC = () => {
     );
   }
 
-  if (!user || !profile) return null;
+  if (!user || !profile) {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-400 mb-4">
+            프로필 정보를 불러올 수 없습니다.
+          </p>
+          <button
+            onClick={() => loadProfile()}
+            className="btn-primary px-6 py-2"
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const formatDuration = (seconds: number) => {
     if (!seconds) return "0:00";
@@ -742,21 +807,13 @@ const MyPage: React.FC = () => {
                     <p className="text-lg">{profile.nickname}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">회원 상태</p>
+                    <p className="text-sm text-gray-400">구독 상태</p>
                     <p className="text-lg">
                       {profile.isUPlusMember
                         ? "LG U+ 회원"
                         : profile.subscriptionStatus === "SUBSCRIBED"
                           ? "베이직 구독 회원"
                           : "일반 회원"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">구독 상태</p>
-                    <p className="text-lg">
-                      {profile.subscriptionStatus === "SUBSCRIBED"
-                        ? "구독 중"
-                        : "미구독"}
                     </p>
                   </div>
                   <div>
@@ -1166,6 +1223,41 @@ const MyPage: React.FC = () => {
                   </span>
                 </div>
 
+                {/* FREE 사용자 현재 제한 안내 */}
+                {!subIsPaid && !subIsUplus && (
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-5 mb-8">
+                    <p className="text-sm font-semibold text-gray-300 mb-3">
+                      현재 이용 가능 범위 (무료 회원)
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        <span className="text-gray-300">무료 콘텐츠 시청</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                        <span className="text-gray-300">
+                          사용자 업로드 콘텐츠 시청
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        <span className="text-gray-500">
+                          유료/오리지널 콘텐츠 접근 불가
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        <span className="text-gray-500">배속 재생 불가</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <X className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        <span className="text-gray-500">화질 제한</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid md:grid-cols-2 gap-8">
                   {/* 카드 1: 베이직 구독 */}
                   <div className="bg-gray-900 rounded-lg p-8">
@@ -1194,19 +1286,15 @@ const MyPage: React.FC = () => {
                     <ul className="space-y-3 mb-8">
                       <li className="flex items-start">
                         <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
-                        <span>BASIC 콘텐츠 무제한 시청</span>
+                        <span>오리지널 · 사용자 업로드 콘텐츠 시청</span>
                       </li>
                       <li className="flex items-start">
                         <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
-                        <span>HD 1080p 화질</span>
+                        <span>배속 재생 가능</span>
                       </li>
                       <li className="flex items-start">
                         <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
-                        <span>배속 재생 기능</span>
-                      </li>
-                      <li className="flex items-start">
-                        <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
-                        <span>광고 없음</span>
+                        <span>전체 화질 접근 가능</span>
                       </li>
                     </ul>
 
@@ -1269,24 +1357,11 @@ const MyPage: React.FC = () => {
                         )}
                       </button>
                     ) : subIsCanceled ? (
-                      <div className="space-y-3">
-                        <button
-                          onClick={handleSubscribe}
-                          disabled={subscribing}
-                          className="w-full btn-primary py-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                          {subscribing ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              처리 중...
-                            </>
-                          ) : (
-                            "다시 구독하기"
-                          )}
-                        </button>
-                        <p className="text-xs text-gray-500 text-center">
-                          해지 예약 상태입니다. 만료일까지 이용 가능하며, 다시
-                          구독하면 해지가 취소됩니다.
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-center">
+                        <p className="text-yellow-400 font-semibold text-sm">
+                          해지 예약 상태입니다.
+                          <br />
+                          만료일까지 모든 혜택을 이용할 수 있습니다.
                         </p>
                       </div>
                     ) : (
@@ -1322,19 +1397,11 @@ const MyPage: React.FC = () => {
                     <ul className="space-y-3 mb-8">
                       <li className="flex items-start">
                         <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
-                        <span>모든 콘텐츠 무제한 시청 (오리지널 포함)</span>
-                      </li>
-                      <li className="flex items-start">
-                        <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
-                        <span>4K UHD 화질 지원</span>
-                      </li>
-                      <li className="flex items-start">
-                        <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
                         <span>베이직 구독의 모든 혜택 포함</span>
                       </li>
                       <li className="flex items-start">
                         <Check className="w-5 h-5 text-primary mr-3 flex-shrink-0 mt-0.5" />
-                        <span>통신사 회원 전용 혜택</span>
+                        <span>LG U+ 전용 콘텐츠 시청 가능</span>
                       </li>
                     </ul>
 
@@ -1350,9 +1417,10 @@ const MyPage: React.FC = () => {
                         <Crown className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                         <p className="text-yellow-400 font-semibold text-sm">
                           베이직 구독 중에는 U+ 인증을 할 수 없습니다.
+                          <br />
                           {subIsCanceled
-                            ? " 구독 만료 후 인증해주세요."
-                            : " 구독 해지 후 인증해주세요."}
+                            ? "구독 만료 후 인증해주세요."
+                            : "구독 해지 후 인증해주세요."}
                         </p>
                       </div>
                     ) : (
@@ -1517,6 +1585,19 @@ const MyPage: React.FC = () => {
           cancelText="취소"
           onConfirm={handleCancel}
           onCancel={() => setShowCancelModal(false)}
+        />
+      )}
+
+      {/* 알림 모달 */}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => {
+            const cb = alertModal.onClose;
+            setAlertModal(null);
+            cb?.();
+          }}
         />
       )}
     </div>

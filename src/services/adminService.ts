@@ -43,6 +43,8 @@ export interface AdminContentUpdateRequest {
   tagIds?: number[];
   accessLevel?: string;
   status?: string;
+}
+
 export interface HomeTagStatItem {
   statDate: string;
   tagId: number;
@@ -252,6 +254,8 @@ export const adminService = {
       },
     );
     return response.data;
+  },
+
   // 홈 노출 태그(priority=1) 통계 조회
   getHomeTagStats: async (statDate: string): Promise<HomeTagStatItem[]> => {
     const response = await apiClient.get("/admin/stats/home-tags", {

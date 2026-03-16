@@ -51,6 +51,12 @@ const Header: React.FC = () => {
             >
               오리지널
             </Link>
+            <Link to="/movie" className="hover:text-primary transition-colors">
+              영화
+            </Link>
+            <Link to="/series" className="hover:text-primary transition-colors">
+              시리즈
+            </Link>
             <Link
               to="/creator"
               className="hover:text-primary transition-colors"
@@ -161,6 +167,20 @@ const Header: React.FC = () => {
                 className="hover:text-primary transition-colors"
               >
                 오리지널
+              </Link>
+              <Link
+                to="/movie"
+                onClick={() => setShowMobileMenu(false)}
+                className="hover:text-primary transition-colors"
+              >
+                영화
+              </Link>
+              <Link
+                to="/series"
+                onClick={() => setShowMobileMenu(false)}
+                className="hover:text-primary transition-colors"
+              >
+                시리즈
               </Link>
               <Link
                 to="/creator"

@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import { Content } from "@/types";
+import { Content, Tag } from "@/types";
 
 // 개발 모드: Mock 사용 여부
 const USE_MOCK = false; // 콘텐츠 API는 실제 API 사용
@@ -68,6 +68,21 @@ const mockContents: Content[] = [
 ];
 
 export const contentService = {
+  getTags: async (
+    section: "LEVEL_0" | "LEVEL_1",
+  ): Promise<{ tagId: number; name: string }[]> => {
+    try {
+      const response = await apiClient.get("/api/tags", {
+        params: { section },
+      });
+      // 백엔드 API는 { tagId: number, name: string }[] 를 반환
+      return response.data.data || [];
+    } catch (error) {
+      console.error(`태그 목록(${section}) 조회 실패:`, error);
+      return [];
+    }
+  },
+
   // 실시간 인기 차트 조회
   getTrendingContents: async (limit: number = 10): Promise<Content[]> => {
     if (USE_MOCK) {
@@ -151,6 +166,8 @@ export const contentService = {
   getDefaultContentList: async (params?: {
     uploaderType?: string;
     tag?: string;
+    accessLevel?: string;
+    contentType?: string;
     page?: number;
     size?: number;
   }): Promise<Content[]> => {

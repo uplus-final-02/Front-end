@@ -281,14 +281,14 @@ const ContentDetailPage: React.FC = () => {
   ) => {
     if (!user || !currentVideoIdRef.current) return;
 
-    // 10초마다 savepoint API 호출
-    const now = Math.floor(currentTime);
-    if (now - lastSaveTimeRef.current >= 10) {
-      lastSaveTimeRef.current = now;
+    // 실제 재생 시간 기준 10초마다 savepoint API 호출
+    const currentPlayDuration = Math.floor(playDurationSec);
+    if (currentPlayDuration > 0 && currentPlayDuration - lastSaveTimeRef.current >= 10) {
+      lastSaveTimeRef.current = currentPlayDuration;
       try {
         await historyService.savePoint(currentVideoIdRef.current, {
           positionSec: Math.floor(currentTime),
-          playDurationSec: Math.floor(playDurationSec),
+          playDurationSec: currentPlayDuration,
         });
       } catch (error) {
         // savepoint 실패는 무시 (재생에 영향 없음)

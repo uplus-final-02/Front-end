@@ -46,6 +46,9 @@ const ContentDetailPage: React.FC = () => {
   const [deleteTargetCommentId, setDeleteTargetCommentId] = useState<
     number | null
   >(null);
+  const [showAutoplayOverlay, setShowAutoplayOverlay] = useState(false);
+  const [autoplayCountdown, setAutoplayCountdown] = useState(0);
+  const autoplayTimerRef = useRef<number | null>(null);
 
   const shouldAutoPlay = searchParams.get("autoplay") === "true";
   const episodeParam = searchParams.get("episode");
@@ -152,7 +155,6 @@ const ContentDetailPage: React.FC = () => {
       }
     }
 
-    checkBookmark();
   }, [content]);
 
   const loadContent = async () => {
@@ -242,19 +244,6 @@ const ContentDetailPage: React.FC = () => {
     }
   };
 
-  const checkBookmark = async () => {
-    if (!id || !user) return;
-    try {
-      const response = await bookmarkService.getBookmarks(undefined, 100);
-      const bookmarked = response.bookmarks.some(
-        (b) => b.contentId === parseInt(id),
-      );
-      setIsBookmarked(bookmarked);
-    } catch (error) {
-      console.error("찜하기 확인 실패:", error);
-    }
-  };
-
   const handleToggleBookmark = async () => {
     if (!id || !user) {
       navigate("/login");
@@ -297,6 +286,7 @@ const ContentDetailPage: React.FC = () => {
   };
 
   const handleEpisodeSelect = async (episode: Episode) => {
+    cancelAutoplay();
     // 에피소드 전환 전 현재 위치 저장
     if (currentVideoIdRef.current && user) {
       const video = document.querySelector("video");
@@ -316,6 +306,7 @@ const ContentDetailPage: React.FC = () => {
 
   // 다음/이전 에피소드 이동 (play API context 활용)
   const handleNextEpisode = () => {
+    cancelAutoplay();
     if (!playInfo?.context?.nextVideoId || !content?.episodes) return;
     const nextEp = content.episodes.find(
       (ep) => ep.id === playInfo.context.nextVideoId!.toString(),
@@ -385,6 +376,40 @@ const ContentDetailPage: React.FC = () => {
     }
   };
 
+  const cancelAutoplay = () => {
+    if (autoplayTimerRef.current) {
+      clearInterval(autoplayTimerRef.current);
+      autoplayTimerRef.current = null;
+    }
+    setShowAutoplayOverlay(false);
+  };
+
+  const startAutoplayCountdown = () => {
+    cancelAutoplay(); // 이전 타이머 정리
+    setShowAutoplayOverlay(true);
+    setAutoplayCountdown(5);
+
+    autoplayTimerRef.current = window.setInterval(() => {
+      setAutoplayCountdown((prev) => {
+        if (prev <= 1) {
+          if (autoplayTimerRef.current) {
+            clearInterval(autoplayTimerRef.current);
+            autoplayTimerRef.current = null;
+          }
+          handleNextEpisode();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleVideoEnded = () => {
+    if (content?.isSeries && playInfo?.context?.nextVideoId) {
+      startAutoplayCountdown();
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("ko-KR", {
@@ -427,12 +452,20 @@ const ContentDetailPage: React.FC = () => {
   // 재생 URL 결정
   const videoUrl = playInfo?.url || null;
   const startPosition = playInfo?.playbackState?.startPositionSec || 0;
+  const nextEpisode =
+    content?.isSeries && playInfo?.context?.nextVideoId
+      ? content.episodes?.find(
+          (ep) => ep.id === playInfo.context.nextVideoId!.toString(),
+        )
+      : null;
 
   return (
     <div className="min-h-screen bg-dark">
       <div className="container mx-auto px-4 py-8">
         <div
-          className={`grid grid-cols-1 ${content.isSeries ? "lg:grid-cols-3" : ""} gap-8`}
+          className={`grid grid-cols-1 ${
+            content.isSeries ? "lg:grid-cols-3" : ""
+          } gap-8`}
         >
           <div
             className={
@@ -442,10 +475,12 @@ const ContentDetailPage: React.FC = () => {
             {/* 비디오 플레이어 영역 + 댓글 사이드 패널 */}
             <div
               key={id}
-              className={`mb-6 flex overflow-hidden rounded-lg ${isFullscreen ? "bg-black h-screen" : ""}`}
+              className={`mb-6 flex overflow-hidden rounded-lg ${
+                isFullscreen ? "bg-black h-screen" : ""
+              }`}
               ref={theaterRef}
             >
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 relative">
                 {playLoading ? (
                   <div className="aspect-video bg-gray-900 flex items-center justify-center rounded-lg">
                     <div className="text-center">
@@ -485,6 +520,7 @@ const ContentDetailPage: React.FC = () => {
                   <VideoPlayer
                     videoUrl={videoUrl}
                     onTimeUpdate={handleTimeUpdate}
+                    onEnded={handleVideoEnded}
                     onToggleComments={() =>
                       setIsCommentPanelOpen((prev) => !prev)
                     }
@@ -502,6 +538,30 @@ const ContentDetailPage: React.FC = () => {
                         재생 가능한 영상이 없습니다.
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {showAutoplayOverlay && nextEpisode && (
+                  <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white z-10">
+                    <h3 className="text-lg font-light mb-2">다음 화 재생</h3>
+                    <h2 className="text-2xl font-bold mb-4">
+                      {nextEpisode.episodeNumber}화. {nextEpisode.title}
+                    </h2>
+                    <button
+                      onClick={handleNextEpisode}
+                      className="btn-primary mb-2"
+                    >
+                      다음 화 재생
+                    </button>
+                    <p className="text-sm text-gray-300 mb-4">
+                      ({autoplayCountdown}초 후 자동 재생)
+                    </p>
+                    <button
+                      onClick={cancelAutoplay}
+                      className="text-sm text-gray-400 hover:text-white"
+                    >
+                      취소
+                    </button>
                   </div>
                 )}
               </div>

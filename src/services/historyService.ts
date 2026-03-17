@@ -39,6 +39,27 @@ export interface WatchHistoryListResponse {
   hasNext: boolean;
 }
 
+// 사용자 콘텐츠 시청 기록 아이템
+export interface UserContentWatchHistoryItem {
+  historyId: number;
+  userContentId: number;
+  parentContentId: number;
+  title: string;
+  description: string | null;
+  thumbnailUrl: string;
+  contentStatus: "HIDDEN" | "VISIBLE" | "DELETED";
+  lastWatchedAt: string;
+  deletedAt: string | null;
+}
+
+// 사용자 콘텐츠 시청 기록 그룹
+export interface UserContentWatchHistoryGroup {
+  parentContentId: number;
+  parentThumbnailUrl: string;
+  parentTitle: string;
+  watchHistories: UserContentWatchHistoryItem[];
+}
+
 export const historyService = {
   /** 영상 재생 위치 저장 POST /api/histories/savepoint/{videoId} */
   savePoint: async (
@@ -65,9 +86,24 @@ export const historyService = {
     return response.data.data;
   },
 
+  /** 홈화면 시청 기록 조회 GET /api/contents/home/watching-list */
+  getHomeWatchHistory: async (): Promise<WatchHistoryListResponse> => {
+    const response = await apiClient.get("/api/contents/home/watching-list"
+    );
+    return response.data.data;
+  },
+
   /** 시청 기록 삭제 DELETE /api/users/me/watch-history/{historyId} */
   deleteWatchHistory: async (historyId: number): Promise<void> => {
     await apiClient.delete(`/api/users/me/watch-history/${historyId}`);
+  },
+
+  /** 사용자 제작 콘텐츠 시청 기록 조회 GET /api/users/me/watch-history/user-content */
+  getUserContentWatchHistory: async (): Promise<UserContentWatchHistoryGroup[]> => {
+    const response = await apiClient.get(
+      "/api/users/me/watch-history/user-content",
+    );
+    return response.data.data;
   },
 };
 

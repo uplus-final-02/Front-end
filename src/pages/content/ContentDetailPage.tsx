@@ -84,6 +84,7 @@ const ContentDetailPage: React.FC = () => {
   // 콘텐츠 로드
   useEffect(() => {
     if (id) {
+      window.scrollTo(0, 0);
       // 콘텐츠 전환 시 상태 리셋
       setIsCommentPanelOpen(false);
       setPlayInfo(null);
@@ -154,7 +155,6 @@ const ContentDetailPage: React.FC = () => {
         setPlayError("재생 가능한 영상 정보를 찾을 수 없습니다.");
       }
     }
-
   }, [content]);
 
   const loadContent = async () => {
@@ -272,7 +272,10 @@ const ContentDetailPage: React.FC = () => {
 
     // 실제 재생 시간 기준 10초마다 savepoint API 호출
     const currentPlayDuration = Math.floor(playDurationSec);
-    if (currentPlayDuration > 0 && currentPlayDuration - lastSaveTimeRef.current >= 10) {
+    if (
+      currentPlayDuration > 0 &&
+      currentPlayDuration - lastSaveTimeRef.current >= 10
+    ) {
       lastSaveTimeRef.current = currentPlayDuration;
       try {
         await historyService.savePoint(currentVideoIdRef.current, {

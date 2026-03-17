@@ -34,6 +34,10 @@ const SocialSetupPage: React.FC = () => {
       setError("닉네임을 입력해주세요.");
       return;
     }
+    if (/\s/.test(nickname)) {
+      setError("닉네임에 공백을 포함할 수 없습니다.");
+      return;
+    }
 
     setLoading(true);
     setError("");

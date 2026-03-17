@@ -336,6 +336,10 @@ const MyPage: React.FC = () => {
       showAlert("닉네임을 입력해주세요.", "info");
       return;
     }
+    if (/\s/.test(nickname)) {
+      showAlert("닉네임에 공백을 포함할 수 없습니다.", "info");
+      return;
+    }
 
     try {
       await profileService.updateNickname(profile.userId, nickname);

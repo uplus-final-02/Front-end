@@ -1,12 +1,15 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { Crown } from "lucide-react";
-import { Content } from "@/types/content";
+import { Film } from "lucide-react";
+import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
 import ContentCard from "@/components/content/ContentCard";
 import ContentModal from "@/components/content/ContentModal";
-import { CONTENT_CONSTANTS } from "@/constants";
+import {
+  CONTENT_CONSTANTS,
+  CONTENT_TYPE,
+} from "@/constants/content";
 
-const OriginalPage: React.FC = () => {
+const MoviePage: React.FC = () => {
   const [contents, setContents] = useState<Content[]>([]);
   const [tags, setTags] = useState<{ tagId: number; name: string }[]>([]);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -51,7 +54,9 @@ const OriginalPage: React.FC = () => {
       const data = await contentService.getDefaultContentList({
         page: 0,
         size: 30,
-        accessLevel: CONTENT_CONSTANTS.ACCESS_LEVELS.UPLUS,
+        uploaderType: CONTENT_CONSTANTS.UPLOADER_TYPES.ADMIN,
+        accessLevel: CONTENT_CONSTANTS.ACCESS_LEVELS.BASIC,
+        contentType: CONTENT_TYPE.SINGLE,
         tag: selectedTag ?? undefined,
       });
       setContents(data);
@@ -74,7 +79,9 @@ const OriginalPage: React.FC = () => {
       const nextPage = pageRef.current + 1;
       const newContents = await contentService.getDefaultContentList({
         page: nextPage,
-        accessLevel: CONTENT_CONSTANTS.ACCESS_LEVELS.UPLUS,
+        uploaderType: CONTENT_CONSTANTS.UPLOADER_TYPES.ADMIN,
+        accessLevel: CONTENT_CONSTANTS.ACCESS_LEVELS.BASIC,
+        contentType: CONTENT_TYPE.SINGLE,
         size: 30,
         tag: selectedTag ?? undefined,
       });
@@ -122,20 +129,20 @@ const OriginalPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-dark">
+    <div className="min-h-screen bg-dark text-white">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-3">
-            <Crown className="w-8 h-8 text-primary" />
-            <h1 className="text-4xl font-bold">오리지널 콘텐츠</h1>
+            <Film className="w-8 h-8 text-primary" />
+            <h1 className="text-4xl font-bold">영화</h1>
           </div>
           <p className="text-xl text-gray-400">
-            독점 제공되는 프리미엄 오리지널 콘텐츠를 만나보세요
+            최신 개봉작부터 명작까지, 다양한 영화를 만나보세요.
           </p>
         </div>
 
         <div className="mb-8 flex flex-wrap gap-2">
-          <button
+           <button
               onClick={() => setSelectedTag(null)}
               className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
                 selectedTag === null
@@ -166,9 +173,9 @@ const OriginalPage: React.FC = () => {
            </div>
         ) : contents.length === 0 ? (
           <div className="text-center py-20">
-            <Crown className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <Film className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-xl text-gray-400">
-              {selectedTag ? `"${selectedTag}" 태그의 오리지널 콘텐츠가 없습니다.` : "오리지널 콘텐츠가 없습니다."}
+              {selectedTag ? `"${selectedTag}" 태그의 영화가 없습니다.` : "영화 콘텐츠가 없습니다."}
             </p>
           </div>
         ) : (
@@ -183,7 +190,6 @@ const OriginalPage: React.FC = () => {
               ))}
             </div>
 
-            {/* 무한스크롤 로딩 트리거 */}
             {hasMore && (
               <div ref={loadMoreRefCallback} className="flex justify-center py-8">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -209,4 +215,4 @@ const OriginalPage: React.FC = () => {
   );
 };
 
-export default OriginalPage;
+export default MoviePage;

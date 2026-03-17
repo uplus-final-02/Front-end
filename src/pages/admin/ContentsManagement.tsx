@@ -76,7 +76,7 @@ const ContentsManagement: React.FC<{
     accessLevel: "FREE",
   });
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [, setThumbnailPreview] = useState<string | null>(null);
   const [allTags, setAllTags] = useState<
     { tagId: number; name: string; priority: number }[]
   >([]);

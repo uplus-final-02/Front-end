@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import {
   Play,
@@ -22,6 +22,7 @@ interface VideoPlayerProps {
   isFullscreen?: boolean;
   startTime?: number;
   autoPlay?: boolean;
+  shortsMode?: boolean;
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -34,6 +35,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   isFullscreen = false,
   startTime = 0,
   autoPlay = false,
+  shortsMode = false,
 }) => {
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -187,13 +189,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   return (
     <div
-      className={`relative bg-black group ${isFullscreen ? "h-full" : ""}`}
+      className={`relative bg-black group ${isFullscreen ? "h-full" : ""} ${shortsMode ? "h-full" : ""}`}
       onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
+      onMouseLeave={() => !shortsMode && setShowControls(false)}
     >
       <video
         ref={videoRef}
-        className={`w-full ${isFullscreen ? "h-full object-contain" : "aspect-video"}`}
+        className={`w-full ${shortsMode ? "h-full object-contain" : isFullscreen ? "h-full object-contain" : "aspect-video"}`}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onPlay={handlePlay}
@@ -202,118 +204,315 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onClick={togglePlay}
       />
 
-      {/* 컨트롤 오버레이 */}
+      {shortsMode ? (
+        <ShortsControls
+          isPlaying={isPlaying}
+          togglePlay={togglePlay}
+          toggleMute={toggleMute}
+          isMuted={isMuted}
+          volume={volume}
+          setVolume={setVolume}
+          setIsMuted={setIsMuted}
+          currentTime={currentTime}
+          setCurrentTime={setCurrentTime}
+          duration={duration}
+          videoRef={videoRef}
+          showControls={showControls}
+        />
+      ) : (
+        <>
+          {/* 기본 모드: 하단 컨트롤 오버레이 */}
+          <div
+            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 transition-opacity ${
+              showControls ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            {/* 진행 바 */}
+            <input
+              type="range"
+              min="0"
+              max={duration || 0}
+              value={currentTime}
+              onChange={handleSeek}
+              className="w-full h-1 mb-4 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={togglePlay}
+                  className="hover:text-primary transition-colors"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-6 h-6" />
+                  ) : (
+                    <Play className="w-6 h-6" />
+                  )}
+                </button>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={toggleMute}
+                    className="hover:text-primary transition-colors"
+                  >
+                    {isMuted || volume === 0 ? (
+                      <VolumeX className="w-5 h-5" />
+                    ) : (
+                      <Volume2 className="w-5 h-5" />
+                    )}
+                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={isMuted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                    className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                </div>
+
+                <span className="text-sm">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-4">
+                <div className="relative flex items-center">
+                  <button
+                    onClick={() => setShowSettings(!showSettings)}
+                    className={`hover:text-primary transition-colors ${!canUseSpeedControl ? "opacity-50 cursor-not-allowed" : ""}`}
+                    disabled={!canUseSpeedControl}
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+
+                  {showSettings && canUseSpeedControl && (
+                    <div className="absolute bottom-full right-0 mb-2 bg-gray-900 rounded-lg p-2 min-w-[120px]">
+                      <div className="text-xs text-gray-400 mb-2">
+                        재생 속도
+                      </div>
+                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                        <button
+                          key={rate}
+                          onClick={() => changePlaybackRate(rate)}
+                          className={`block w-full text-left px-3 py-2 rounded hover:bg-gray-800 transition-colors ${playbackRate === rate ? "text-primary" : ""}`}
+                        >
+                          {rate}x
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {onToggleComments && isFullscreen && (
+                  <button
+                    onClick={onToggleComments}
+                    className={`hover:text-primary transition-colors ${isCommentOpen ? "text-primary" : ""}`}
+                    title="댓글"
+                  >
+                    <MessageCircle className="w-5 h-5" />
+                  </button>
+                )}
+
+                <button
+                  onClick={toggleFullscreen}
+                  className="hover:text-primary transition-colors"
+                >
+                  {isFullscreen ? (
+                    <Minimize className="w-5 h-5" />
+                  ) : (
+                    <Maximize className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {!canUseSpeedControl && (
+              <div className="mt-2 text-xs text-gray-400">
+                배속 재생은 구독 회원만 이용 가능합니다
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+/* ── 쇼츠 모드 컨트롤 (드래그 지원) ── */
+interface ShortsControlsProps {
+  isPlaying: boolean;
+  togglePlay: () => void;
+  toggleMute: () => void;
+  isMuted: boolean;
+  volume: number;
+  setVolume: (v: number) => void;
+  setIsMuted: (m: boolean) => void;
+  currentTime: number;
+  setCurrentTime: (t: number) => void;
+  duration: number;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  showControls: boolean;
+}
+
+const ShortsControls: React.FC<ShortsControlsProps> = ({
+  isPlaying,
+  togglePlay,
+  toggleMute,
+  isMuted,
+  volume,
+  setVolume,
+  setIsMuted,
+  currentTime,
+  setCurrentTime,
+  duration,
+  videoRef,
+  showControls,
+}) => {
+  const volBarRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const draggingVol = useRef(false);
+  const draggingProgress = useRef(false);
+  const [volHover, setVolHover] = useState(false);
+
+  const applyVolume = useCallback(
+    (clientX: number) => {
+      const bar = volBarRef.current;
+      const video = videoRef.current;
+      if (!bar || !video) return;
+      const rect = bar.getBoundingClientRect();
+      const ratio = Math.max(
+        0,
+        Math.min(1, (clientX - rect.left) / rect.width),
+      );
+      video.volume = ratio;
+      setVolume(ratio);
+      setIsMuted(ratio === 0);
+    },
+    [videoRef, setVolume, setIsMuted],
+  );
+
+  const applyProgress = useCallback(
+    (clientX: number) => {
+      const bar = progressBarRef.current;
+      const video = videoRef.current;
+      if (!bar || !video || !duration) return;
+      const rect = bar.getBoundingClientRect();
+      const ratio = Math.max(
+        0,
+        Math.min(1, (clientX - rect.left) / rect.width),
+      );
+      video.currentTime = ratio * duration;
+      setCurrentTime(ratio * duration);
+    },
+    [videoRef, duration, setCurrentTime],
+  );
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (draggingVol.current) applyVolume(e.clientX);
+      if (draggingProgress.current) applyProgress(e.clientX);
+    };
+    const onMouseUp = () => {
+      draggingVol.current = false;
+      draggingProgress.current = false;
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [applyVolume, applyProgress]);
+
+  const volValue = isMuted ? 0 : volume;
+
+  return (
+    <>
+      {/* 상단 컨트롤 */}
       <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 transition-opacity ${
+        className={`absolute top-0 left-0 right-0 p-3 flex items-center transition-opacity ${
           showControls ? "opacity-100" : "opacity-0"
         }`}
       >
-        {/* 진행 바 */}
-        <input
-          type="range"
-          min="0"
-          max={duration || 0}
-          value={currentTime}
-          onChange={handleSeek}
-          className="w-full h-1 mb-4 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
-        />
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={togglePlay}
-              className="hover:text-primary transition-colors"
-            >
-              {isPlaying ? (
-                <Pause className="w-6 h-6" />
-              ) : (
-                <Play className="w-6 h-6" />
-              )}
-            </button>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={toggleMute}
-                className="hover:text-primary transition-colors"
-              >
-                {isMuted || volume === 0 ? (
-                  <VolumeX className="w-5 h-5" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </button>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={isMuted ? 0 : volume}
-                onChange={handleVolumeChange}
-                className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary"
-              />
-            </div>
-
-            <span className="text-sm">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <div className="relative flex items-center">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className={`hover:text-primary transition-colors ${!canUseSpeedControl ? "opacity-50 cursor-not-allowed" : ""}`}
-                disabled={!canUseSpeedControl}
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-
-              {showSettings && canUseSpeedControl && (
-                <div className="absolute bottom-full right-0 mb-2 bg-gray-900 rounded-lg p-2 min-w-[120px]">
-                  <div className="text-xs text-gray-400 mb-2">재생 속도</div>
-                  {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
-                    <button
-                      key={rate}
-                      onClick={() => changePlaybackRate(rate)}
-                      className={`block w-full text-left px-3 py-2 rounded hover:bg-gray-800 transition-colors ${playbackRate === rate ? "text-primary" : ""}`}
-                    >
-                      {rate}x
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {onToggleComments && isFullscreen && (
-              <button
-                onClick={onToggleComments}
-                className={`hover:text-primary transition-colors ${isCommentOpen ? "text-primary" : ""}`}
-                title="댓글"
-              >
-                <MessageCircle className="w-5 h-5" />
-              </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={togglePlay}
+            className="hover:text-primary transition-colors"
+          >
+            {isPlaying ? (
+              <Pause className="w-7 h-7" />
+            ) : (
+              <Play className="w-7 h-7" />
             )}
-
+          </button>
+          <div
+            className="relative flex items-center"
+            onMouseEnter={() => setVolHover(true)}
+            onMouseLeave={() => !draggingVol.current && setVolHover(false)}
+          >
             <button
-              onClick={toggleFullscreen}
+              onClick={toggleMute}
               className="hover:text-primary transition-colors"
             >
-              {isFullscreen ? (
-                <Minimize className="w-5 h-5" />
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-6 h-6" />
               ) : (
-                <Maximize className="w-5 h-5" />
+                <Volume2 className="w-6 h-6" />
               )}
             </button>
+            <div
+              className="flex items-center transition-all duration-200 overflow-visible"
+              style={{
+                width: volHover || draggingVol.current ? 96 : 0,
+                opacity: volHover || draggingVol.current ? 1 : 0,
+              }}
+            >
+              <div
+                ref={volBarRef}
+                className="relative w-20 h-1 ml-2 bg-white/30 rounded-full cursor-pointer"
+                onMouseDown={(e) => {
+                  draggingVol.current = true;
+                  applyVolume(e.clientX);
+                }}
+              >
+                <div
+                  className="h-full bg-white rounded-full"
+                  style={{ width: `${volValue * 100}%` }}
+                />
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white shadow-md pointer-events-none"
+                  style={{
+                    left: `${volValue * 100}%`,
+                    transform: `translate(-50%, -50%)`,
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
-
-        {!canUseSpeedControl && (
-          <div className="mt-2 text-xs text-gray-400">
-            배속 재생은 구독 회원만 이용 가능합니다
-          </div>
-        )}
       </div>
-    </div>
+
+      {/* 하단 진행바 */}
+      <div
+        ref={progressBarRef}
+        className="absolute bottom-0 left-0 right-0 h-1 bg-white/20 cursor-pointer group/bar"
+        onMouseDown={(e) => {
+          draggingProgress.current = true;
+          applyProgress(e.clientX);
+        }}
+      >
+        <div
+          className="h-full bg-primary relative"
+          style={{
+            width: duration ? `${(currentTime / duration) * 100}%` : "0%",
+          }}
+        >
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 rounded-full bg-primary scale-0 group-hover/bar:scale-100 transition-transform" />
+        </div>
+      </div>
+    </>
   );
 };
 

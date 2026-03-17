@@ -285,20 +285,20 @@ export const contentService = {
   },
 
   // 콘텐츠 상세 조회
-  getContentDetail: async (contentId: string): Promise<any> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return mockContents.find((c) => c.id === contentId);
-    }
+  // getContentDetail: async (contentId: string): Promise<any> => {
+  //   if (USE_MOCK) {
+  //     await new Promise((resolve) => setTimeout(resolve, 300));
+  //     return mockContents.find((c) => c.id === contentId);
+  //   }
 
-    try {
-      const response = await apiClient.get(`/api/contents/${contentId}`);
-      return response.data;
-    } catch (error) {
-      console.error("콘텐츠 상세 조회 실패:", error);
-      throw error;
-    }
-  },
+  //   try {
+  //     const response = await apiClient.get(`/api/contents/${contentId}`);
+  //     return response.data;
+  //   } catch (error) {
+  //     console.error("콘텐츠 상세 조회 실패:", error);
+  //     throw error;
+  //   }
+  // },
 
   // 에피소드 목록 조회
   getEpisodes: async (contentId: string): Promise<any[]> => {
@@ -351,40 +351,39 @@ export const contentService = {
   },
 
   // 댓글 조회
-  getComments: async (
-    contentId: string,
-    episodeId?: string,
-  ): Promise<any[]> => {
-    const comments = JSON.parse(localStorage.getItem("ott_comments") || "[]");
-    return comments.filter(
-      (c: any) =>
-        c.contentId === contentId &&
-        (episodeId ? c.episodeId === episodeId : true),
-    );
-  },
+  // getComments: async (
+  //     videoId: number | string,
+  //     page: number = 0,
+  //     size: number = 20,
+  //   ): Promise<CommentPage> => {
+  //     const response = await apiClient.get(`/api/videos/${videoId}/comments`, {
+  //       params: { page, size },
+  //     });
+  //     return response.data.data;
+  //   },
 
   // 댓글 작성
-  addComment: async (
-    contentId: string,
-    userId: string,
-    userName: string,
-    content: string,
-    episodeId?: string,
-  ): Promise<any> => {
-    const comments = JSON.parse(localStorage.getItem("ott_comments") || "[]");
-    const newComment = {
-      id: `comment-${Date.now()}`,
-      contentId,
-      episodeId,
-      userId,
-      userName,
-      content,
-      createdAt: new Date().toISOString(),
-    };
-    comments.unshift(newComment);
-    localStorage.setItem("ott_comments", JSON.stringify(comments));
-    return newComment;
-  },
+  // addComment: async (
+  //   contentId: string,
+  //   userId: string,
+  //   userName: string,
+  //   content: string,
+  //   episodeId?: string,
+  // ): Promise<any> => {
+  //   const comments = JSON.parse(localStorage.getItem("ott_comments") || "[]");
+  //   const newComment = {
+  //     id: `comment-${Date.now()}`,
+  //     contentId,
+  //     episodeId,
+  //     userId,
+  //     userName,
+  //     content,
+  //     createdAt: new Date().toISOString(),
+  //   };
+  //   comments.unshift(newComment);
+  //   localStorage.setItem("ott_comments", JSON.stringify(comments));
+  //   return newComment;
+  // },
 
   // 시청 이력 조회
   getWatchHistory: async (userId: string): Promise<any[]> => {

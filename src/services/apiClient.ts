@@ -20,16 +20,6 @@ export const apiClient = axios.create({
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
-const clearAuthAndRedirectToLogin = () => {
-  localStorage.removeItem("ott_current_user");
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
-
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
-  }
-};
-
 const doRefreshToken = async (): Promise<string | null> => {
   const refreshToken = localStorage.getItem("refreshToken");
   if (!refreshToken) return null;
@@ -47,8 +37,9 @@ const doRefreshToken = async (): Promise<string | null> => {
     }
     return accessToken;
   } catch {
-    // refresh token도 만료 / 탈퇴 등으로 재발급 불가
-    clearAuthAndRedirectToLogin();
+    // refresh token도 만료 → 로그아웃
+    localStorage.clear();
+    window.location.href = "/login";
     return null;
   }
 };
@@ -108,7 +99,8 @@ apiClient.interceptors.response.use(
 
     // 403: 탈퇴 회원 / 권한 없음 등 → 즉시 로그아웃 처리
     if (error.response?.status === 403) {
-      clearAuthAndRedirectToLogin();
+      // refresh token도 만료 → 로그아웃
+      localStorage.clear();
       return Promise.reject(error);
     }
 

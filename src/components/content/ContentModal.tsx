@@ -26,37 +26,42 @@ const ContentModal: React.FC<ContentModalProps> = ({
   useEffect(() => {
     document.body.style.overflow = "hidden";
     checkBookmark();
-    loadEpisodes();
-    // 감독/출연 등 상세 정보가 없으면 상세 API로 보강
+    // 감독/출연 등 상세 정보가 없으면 상세 API로 보강 후 에피소드 로드
     if (!initialContent.director && !initialContent.actor) {
-      enrichContent();
+      enrichContent().then((enriched) => loadEpisodes(enriched));
+    } else {
+      loadEpisodes();
     }
     return () => {
       document.body.style.overflow = "unset";
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const enrichContent = async () => {
+  const enrichContent = async (): Promise<Content> => {
     try {
       const full = await contentService.getContentById(initialContent.id);
-      setContent((prev) => ({
-        ...prev,
-        description: full.description || prev.description,
-        director: full.director || prev.director,
-        actor: full.actor || prev.actor,
-        releaseDate: full.releaseDate || prev.releaseDate,
-        uploaderName: full.uploaderName || prev.uploaderName,
-        viewCount: full.viewCount ?? prev.viewCount,
-        isSeries: full.isSeries ?? prev.isSeries,
-        type: full.type || prev.type,
-      }));
+      const enriched = {
+        ...content,
+        description: full.description || content.description,
+        director: full.director || content.director,
+        actor: full.actor || content.actor,
+        releaseDate: full.releaseDate || content.releaseDate,
+        uploaderName: full.uploaderName || content.uploaderName,
+        viewCount: full.viewCount ?? content.viewCount,
+        isSeries: full.isSeries ?? content.isSeries,
+        type: full.type || content.type,
+      };
+      setContent(enriched);
+      return enriched;
     } catch {
-      // 실패 시 기존 데이터 유지
+      return content;
     }
   };
 
-  const loadEpisodes = async () => {
-    if (content.type !== "series" && !content.isSeries) return;
+  const loadEpisodes = async (overrideContent?: Content) => {
+    const c = overrideContent || content;
+    if (c.type !== "series" && !c.isSeries) return;
 
     setLoadingEpisodes(true);
     try {

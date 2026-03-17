@@ -18,22 +18,32 @@ export interface SearchResult {
 }
 
 // 백엔드 검색 아이템 → Content 변환
-const mapSearchItem = (item: any): Content => ({
-  id: item.contentId?.toString(),
-  title: item.highlightTitle?.replace(/<\/?em>/g, "") || item.title,
-  highlightTitle: item.highlightTitle || null,
-  highlightDescription: item.highlightDescription || null,
-  thumbnailUrl: item.thumbnailUrl,
-  thumbnail: item.thumbnailUrl,
-  tags: item.tags || [],
-  matchType: item.matchType,
-  rating: 0,
-  year: new Date().getFullYear(),
-  duration: 0,
-  description: item.highlightDescription || "",
-  accessLevel: "FREE",
-  viewCount: 0,
-});
+const mapSearchItem = (item: any): Content => {
+  const rawType = item.type ?? item.contentType;
+  return {
+    id: item.contentId?.toString(),
+    title: item.title,
+    highlightTitle: item.highlightTitle || null,
+    highlightDescription: item.highlightDescription || null,
+    thumbnailUrl: item.thumbnailUrl,
+    thumbnail: item.thumbnailUrl,
+    tags: item.tags || [],
+    matchType: item.matchType,
+    type:
+      rawType === "SINGLE"
+        ? "movie"
+        : rawType === "SERIES"
+          ? "series"
+          : undefined,
+    isSeries: rawType === "SERIES",
+    rating: 0,
+    year: new Date().getFullYear(),
+    duration: 0,
+    description: item.highlightDescription || "",
+    accessLevel: item.accessLevel || "FREE",
+    viewCount: item.totalViewCount ?? 0,
+  };
+};
 
 export const searchService = {
   /** 메인 검색 */

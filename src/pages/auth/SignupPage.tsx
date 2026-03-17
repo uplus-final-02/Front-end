@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { authService } from "@/services/authService";
 import { getOAuthUrl } from "@/utils/oauth";
+import AlertModal from "@/components/common/AlertModal";
 import type { SocialProvider } from "@/types";
 
 type SignupStep = "email" | "profile" | "tags";
@@ -13,6 +14,10 @@ const SignupPage: React.FC = () => {
   const [step, setStep] = useState<SignupStep>("email");
   const [tags, setTags] = useState<{ tagId: number; name: string }[]>([]);
   const [tagsLoading, setTagsLoading] = useState(false);
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   // 폼 데이터
   const [email, setEmail] = useState("");
@@ -50,6 +55,10 @@ const SignupPage: React.FC = () => {
     try {
       await authService.sendVerificationCode(email);
       setCodeSent(true);
+      setAlertModal({
+        message: "인증코드가 발송되었습니다.\n이메일을 확인해주세요.",
+        type: "success",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "인증코드 발송 실패");
     } finally {
@@ -485,6 +494,14 @@ const SignupPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </div>
   );
 };

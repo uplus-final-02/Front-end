@@ -103,7 +103,6 @@ const MyPage: React.FC = () => {
   };
   const [phoneNumber, setPhoneNumber] = useState("");
   const [verifying, setVerifying] = useState(false);
-  const [verifyResult, setVerifyResult] = useState<string | null>(null);
 
   // 선호 태그 편집
   const [editingTags, setEditingTags] = useState(false);
@@ -438,19 +437,17 @@ const MyPage: React.FC = () => {
       return;
     }
     setVerifying(true);
-    setVerifyResult(null);
     try {
       const result = await subscriptionService.verifyUplus(cleaned);
       if (result.verified) {
-        setVerifyResult("success");
+        showAlert("LG U+ 회원 인증이 완료되었습니다!", "success");
         await refreshAuth();
         loadSubscription();
         loadProfile();
       } else {
-        setVerifyResult("fail");
+        showAlert("LG U+ 회원이 아니거나 인증에 실패했습니다.", "error");
       }
     } catch (error: any) {
-      setVerifyResult("fail");
       showAlert(
         error.response?.data?.message || "인증에 실패했습니다.",
         "error",
@@ -1439,17 +1436,6 @@ const MyPage: React.FC = () => {
                             maxLength={13}
                           />
                         </div>
-
-                        {verifyResult === "fail" && (
-                          <p className="text-red-400 text-sm">
-                            LG U+ 회원이 아니거나 인증에 실패했습니다.
-                          </p>
-                        )}
-                        {verifyResult === "success" && (
-                          <p className="text-green-400 text-sm">
-                            LG U+ 회원 인증이 완료되었습니다!
-                          </p>
-                        )}
 
                         <button
                           onClick={handleVerifyUplus}

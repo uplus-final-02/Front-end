@@ -134,6 +134,13 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
+    // 403: 탈퇴 회원 / 권한 없음 등 → 즉시 로그아웃 처리
+    if (error.response?.status === 403) {
+      // refresh token도 만료 → 로그아웃
+      localStorage.clear();
+      return Promise.reject(error);
+    }
+
     // 401 에러 (토큰 만료) 처리 - request 인터셉터에서 놓친 경우 fallback
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;

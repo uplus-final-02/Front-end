@@ -47,7 +47,31 @@ const doRefreshToken = async (): Promise<string | null> => {
 // Request 인터셉터 - 토큰 자동 추가 (만료 시 선제적 재발급)
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // 인증 관련 요청은 토큰 처리 건너뛰기
+    const url = config.url || "";
+    if (
+      url.includes("/api/auth/signup") ||
+      url.includes("/api/auth/login") ||
+      url.includes("/api/auth/reissue")
+    ) {
+      return config;
+    }
+
     let token = localStorage.getItem("accessToken");
+
+    // accessToken이 없지만 refreshToken이 있으면 재발급 시도
+    if (!token && localStorage.getItem("refreshToken")) {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refreshPromise = doRefreshToken();
+      }
+      const newToken = await refreshPromise;
+      isRefreshing = false;
+      refreshPromise = null;
+      if (newToken) {
+        token = newToken;
+      }
+    }
 
     if (token && config.headers) {
       try {
@@ -72,11 +96,24 @@ apiClient.interceptors.request.use(
           }
         }
       } catch {
-        // 파싱 실패 시 토큰 제거
-        localStorage.removeItem("ott_current_user");
+        // 파싱 실패 시 토큰 제거 후 재발급 시도
         localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        return config;
+        if (localStorage.getItem("refreshToken")) {
+          if (!isRefreshing) {
+            isRefreshing = true;
+            refreshPromise = doRefreshToken();
+          }
+          const newToken = await refreshPromise;
+          isRefreshing = false;
+          refreshPromise = null;
+          if (newToken) {
+            token = newToken;
+          } else {
+            return config;
+          }
+        } else {
+          return config;
+        }
       }
       config.headers.Authorization = `Bearer ${token}`;
     }

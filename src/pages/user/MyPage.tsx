@@ -19,7 +19,10 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
-import { authService } from "@/services/authService";
+import {
+  authService,
+  type WithdrawalReason,
+} from "@/services/authService";
 import { bookmarkService } from "@/services/bookmarkService";
 import type { BookmarkItem, PlaylistItem } from "@/types/bookmark";
 import {
@@ -113,6 +116,9 @@ const MyPage: React.FC = () => {
   // 통계
   const [watchStats, setWatchStats] = useState<WatchStatistics | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+
+  // 탈퇴
+  const [withdrawReason, setWithdrawReason] = useState<WithdrawalReason>("OTHER");
 
   useEffect(() => {
     // AuthContext 로딩 중이면 대기
@@ -548,27 +554,39 @@ const MyPage: React.FC = () => {
     return "일반 회원";
   };
 
-  const handleDeleteAccount = async () => {
-    if (!profile) return;
-    if (
-      !confirm("정말로 회원 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.")
-    ) {
-      return;
-    }
-    try {
-      await authService.deleteAccount(profile.userId.toString());
-      logout();
-      navigate("/");
-      showAlert("회원 탈퇴가 완료되었습니다.", "success");
-    } catch (error: any) {
-      console.error("회원 탈퇴 실패:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "회원 탈퇴에 실패했습니다.";
-      showAlert(errorMessage, "error");
-    }
-  };
+    const handleDeleteAccount = async () => {
+  if (
+    !confirm("정말로 회원 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.")
+  ) {
+    return;
+  }
+
+  try {
+    await authService.withdraw({
+      reason: withdrawReason,
+    });
+
+    // 프론트 인증 정보 즉시 제거
+    logout();
+
+    // 로그인 페이지로 이동 + 안내 메시지 전달
+    navigate("/login", {
+      replace: true,
+      state: {
+        message: "회원 탈퇴가 완료되었습니다.",
+      },
+    });
+  } catch (error: any) {
+    console.error("회원 탈퇴 실패:", error);
+
+    const errorMessage =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      "회원 탈퇴에 실패했습니다.";
+
+    showAlert(errorMessage, "error");
+  }
+};
 
   if (authLoading || loading) {
     return (
@@ -602,6 +620,16 @@ const MyPage: React.FC = () => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+    const withdrawalReasonOptions: {
+    label: string;
+    value: WithdrawalReason;
+  }[] = [
+    { label: "요금이 비싸서", value: "PRICE" },
+    { label: "콘텐츠가 부족해서", value: "CONTENT" },
+    { label: "서비스 사용이 불편해서", value: "UX" },
+    { label: "기타", value: "OTHER" },
+  ];
 
   return (
     <div className="min-h-screen bg-dark">
@@ -896,11 +924,38 @@ const MyPage: React.FC = () => {
             </div>
 
             {/* 회원 탈퇴 */}
+                        {/* 회원 탈퇴 */}
             <div className="bg-gray-900 rounded-lg p-6">
               <h3 className="text-lg font-bold mb-3 text-red-500">회원 탈퇴</h3>
               <p className="text-gray-400 mb-4">
                 탈퇴 시 모든 데이터가 삭제되며 복구할 수 없습니다.
               </p>
+
+              <div className="mb-5">
+                <p className="text-sm text-gray-400 mb-3">탈퇴 사유</p>
+                <div className="space-y-2">
+                  {withdrawalReasonOptions.map((reason) => (
+                    <label
+                      key={reason.value}
+                      className="flex items-center gap-2 text-sm text-white cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="withdrawReason"
+                        value={reason.value}
+                        checked={withdrawReason === reason.value}
+                        onChange={(e) =>
+                          setWithdrawReason(
+                            e.target.value as WithdrawalReason,
+                          )
+                        }
+                      />
+                      <span>{reason.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <button
                 onClick={handleDeleteAccount}
                 className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded transition-colors flex items-center space-x-2"

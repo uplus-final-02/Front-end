@@ -47,7 +47,31 @@ const doRefreshToken = async (): Promise<string | null> => {
 // Request 인터셉터 - 토큰 자동 추가 (만료 시 선제적 재발급)
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // 인증 관련 요청은 토큰 처리 건너뛰기
+    const url = config.url || "";
+    if (
+      url.includes("/api/auth/signup") ||
+      url.includes("/api/auth/login") ||
+      url.includes("/api/auth/reissue")
+    ) {
+      return config;
+    }
+
     let token = localStorage.getItem("accessToken");
+
+    // accessToken이 없지만 refreshToken이 있으면 재발급 시도
+    if (!token && localStorage.getItem("refreshToken")) {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refreshPromise = doRefreshToken();
+      }
+      const newToken = await refreshPromise;
+      isRefreshing = false;
+      refreshPromise = null;
+      if (newToken) {
+        token = newToken;
+      }
+    }
 
     if (token && config.headers) {
       try {
@@ -72,9 +96,24 @@ apiClient.interceptors.request.use(
           }
         }
       } catch {
-        // 파싱 실패 시 토큰 제거
+        // 파싱 실패 시 토큰 제거 후 재발급 시도
         localStorage.removeItem("accessToken");
-        return config;
+        if (localStorage.getItem("refreshToken")) {
+          if (!isRefreshing) {
+            isRefreshing = true;
+            refreshPromise = doRefreshToken();
+          }
+          const newToken = await refreshPromise;
+          isRefreshing = false;
+          refreshPromise = null;
+          if (newToken) {
+            token = newToken;
+          } else {
+            return config;
+          }
+        } else {
+          return config;
+        }
       }
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -94,6 +133,13 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
+
+    // 403: 탈퇴 회원 / 권한 없음 등 → 즉시 로그아웃 처리
+    if (error.response?.status === 403) {
+      // refresh token도 만료 → 로그아웃
+      localStorage.clear();
+      return Promise.reject(error);
+    }
 
     // 401 에러 (토큰 만료) 처리 - request 인터셉터에서 놓친 경우 fallback
     if (error.response?.status === 401 && !originalRequest._retry) {

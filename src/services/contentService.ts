@@ -1,5 +1,5 @@
 import apiClient from "./apiClient";
-import { Content, Tag } from "@/types";
+import { Content } from "@/types";
 
 // 개발 모드: Mock 사용 여부
 const USE_MOCK = false; // 콘텐츠 API는 실제 API 사용

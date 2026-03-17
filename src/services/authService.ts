@@ -5,6 +5,8 @@ const STORAGE_KEY = "ott_current_user";
 const TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
 
+export type WithdrawalReason = "PRICE" | "CONTENT" | "UX" | "OTHER";
+  
 export const authService = {
   // ══════════════════════════════════════════════════════════════
   //  회원가입 4단계
@@ -271,12 +273,15 @@ export const authService = {
     }
   },
 
-  // 계정 삭제 (로컬 데이터 삭제)
-  deleteAccount: async (_userId: string): Promise<void> => {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
+  // 회원 탈퇴
+  withdraw: async (data: {
+    reason: WithdrawalReason;
+  }): Promise<void> => {
+    await apiClient.delete("/api/users/me", {
+      data,
+    });
   },
+
 
   // ══════════════════════════════════════════════════════════════
   //  소셜 로그인

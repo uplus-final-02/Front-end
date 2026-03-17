@@ -19,10 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
-import {
-  authService,
-  type WithdrawalReason,
-} from "@/services/authService";
+import { authService, type WithdrawalReason } from "@/services/authService";
 import { bookmarkService } from "@/services/bookmarkService";
 import type { BookmarkItem, PlaylistItem } from "@/types/bookmark";
 import {
@@ -80,6 +77,10 @@ const MyPage: React.FC = () => {
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [playlistLoading, setPlaylistLoading] = useState(false);
 
+  // 북마크 선택 모드 (연속 재생용) - 배열로 선택 순서 유지
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedBookmarkIds, setSelectedBookmarkIds] = useState<number[]>([]);
+
   // 시청 이력
   const [watchHistory, setWatchHistory] = useState<WatchHistoryItem[]>([]);
   const [historyCursor, setHistoryCursor] = useState<number | null>(null);
@@ -118,7 +119,8 @@ const MyPage: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(false);
 
   // 탈퇴
-  const [withdrawReason, setWithdrawReason] = useState<WithdrawalReason>("OTHER");
+  const [withdrawReason, setWithdrawReason] =
+    useState<WithdrawalReason>("OTHER");
 
   useEffect(() => {
     // AuthContext 로딩 중이면 대기
@@ -201,14 +203,67 @@ const MyPage: React.FC = () => {
         showAlert("재생할 콘텐츠가 없습니다.", "info");
         return;
       }
-      setPlaylist(data.playlist);
+      // 선택 모드면 선택한 콘텐츠만 필터링
+      let filtered = data.playlist;
+      if (selectMode && selectedBookmarkIds.length > 0) {
+        // 선택 순서대로 콘텐츠를 정렬
+        const orderMap = new Map(
+          selectedBookmarkIds.map((id, idx) => [id, idx]),
+        );
+        filtered = data.playlist
+          .filter((item) => orderMap.has(item.contentId))
+          .sort(
+            (a, b) => orderMap.get(a.contentId)! - orderMap.get(b.contentId)!,
+          );
+        if (filtered.length === 0) {
+          showAlert("선택한 콘텐츠 중 재생 가능한 항목이 없습니다.", "info");
+          return;
+        }
+      }
+      // 콘텐츠(찜) 단위로 정렬하되, 같은 콘텐츠 내 에피소드 순서는 유지
+      const grouped: Map<number, PlaylistItem[]> = new Map();
+      const contentOrder: number[] = [];
+      for (const item of filtered) {
+        if (!grouped.has(item.contentId)) {
+          grouped.set(item.contentId, []);
+          contentOrder.push(item.contentId);
+        }
+        grouped.get(item.contentId)!.push(item);
+      }
+      // 선택 모드가 아닐 때만 콘텐츠 순서를 역순(최신순)으로
+      if (!(selectMode && selectedBookmarkIds.length > 0)) {
+        contentOrder.reverse();
+      }
+      const reordered = contentOrder.flatMap((id) => grouped.get(id)!);
+      setPlaylist(reordered);
       setPlaylistIndex(0);
       setShowPlaylist(true);
+      setSelectMode(false);
+      setSelectedBookmarkIds([]);
     } catch (error) {
       console.error("플레이리스트 조회 실패:", error);
       showAlert("플레이리스트를 불러오는데 실패했습니다.", "error");
     } finally {
       setPlaylistLoading(false);
+    }
+  };
+
+  const toggleBookmarkSelect = (contentId: number) => {
+    setSelectedBookmarkIds((prev) => {
+      const idx = prev.indexOf(contentId);
+      if (idx !== -1) {
+        return prev.filter((id) => id !== contentId);
+      } else {
+        return [...prev, contentId];
+      }
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedBookmarkIds.length === bookmarks.length) {
+      setSelectedBookmarkIds([]);
+    } else {
+      setSelectedBookmarkIds(bookmarks.map((b) => b.contentId));
     }
   };
 
@@ -252,21 +307,12 @@ const MyPage: React.FC = () => {
   };
 
   const handleContentClick = (bookmark: BookmarkItem) => {
-    // BookmarkItem을 Content 타입으로 변환
-    const content: Content = {
-      id: bookmark.contentId.toString(),
-      title: bookmark.title,
-      thumbnailUrl: bookmark.thumbnailUrl,
-      rating: 0,
-      year: new Date().getFullYear(),
-      duration: 0,
-      description: "",
-      tags: bookmark.category ? [bookmark.category] : [],
-      accessLevel: "FREE",
-      viewCount: 0,
-      isSeries: bookmark.contentType === "SERIES",
-    };
+    const content: Content = bookmarkToContent(bookmark);
     setSelectedContent(content);
+  };
+
+  const handleBookmarkPlay = (bookmark: BookmarkItem) => {
+    navigate(`/content/${bookmark.contentId}`);
   };
 
   const bookmarkToContent = (bookmark: BookmarkItem): Content => {
@@ -554,39 +600,39 @@ const MyPage: React.FC = () => {
     return "일반 회원";
   };
 
-    const handleDeleteAccount = async () => {
-  if (
-    !confirm("정말로 회원 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.")
-  ) {
-    return;
-  }
+  const handleDeleteAccount = async () => {
+    if (
+      !confirm("정말로 회원 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.")
+    ) {
+      return;
+    }
 
-  try {
-    await authService.withdraw({
-      reason: withdrawReason,
-    });
+    try {
+      await authService.withdraw({
+        reason: withdrawReason,
+      });
 
-    // 프론트 인증 정보 즉시 제거
-    logout();
+      // 프론트 인증 정보 즉시 제거
+      logout();
 
-    // 로그인 페이지로 이동 + 안내 메시지 전달
-    navigate("/login", {
-      replace: true,
-      state: {
-        message: "회원 탈퇴가 완료되었습니다.",
-      },
-    });
-  } catch (error: any) {
-    console.error("회원 탈퇴 실패:", error);
+      // 로그인 페이지로 이동 + 안내 메시지 전달
+      navigate("/login", {
+        replace: true,
+        state: {
+          message: "회원 탈퇴가 완료되었습니다.",
+        },
+      });
+    } catch (error: any) {
+      console.error("회원 탈퇴 실패:", error);
 
-    const errorMessage =
-      error.response?.data?.message ||
-      error.response?.data?.error ||
-      "회원 탈퇴에 실패했습니다.";
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "회원 탈퇴에 실패했습니다.";
 
-    showAlert(errorMessage, "error");
-  }
-};
+      showAlert(errorMessage, "error");
+    }
+  };
 
   if (authLoading || loading) {
     return (
@@ -621,7 +667,7 @@ const MyPage: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-    const withdrawalReasonOptions: {
+  const withdrawalReasonOptions: {
     label: string;
     value: WithdrawalReason;
   }[] = [
@@ -924,7 +970,7 @@ const MyPage: React.FC = () => {
             </div>
 
             {/* 회원 탈퇴 */}
-                        {/* 회원 탈퇴 */}
+            {/* 회원 탈퇴 */}
             <div className="bg-gray-900 rounded-lg p-6">
               <h3 className="text-lg font-bold mb-3 text-red-500">회원 탈퇴</h3>
               <p className="text-gray-400 mb-4">
@@ -945,9 +991,7 @@ const MyPage: React.FC = () => {
                         value={reason.value}
                         checked={withdrawReason === reason.value}
                         onChange={(e) =>
-                          setWithdrawReason(
-                            e.target.value as WithdrawalReason,
-                          )
+                          setWithdrawReason(e.target.value as WithdrawalReason)
                         }
                       />
                       <span>{reason.label}</span>
@@ -985,30 +1029,102 @@ const MyPage: React.FC = () => {
             ) : (
               <>
                 {/* 연속 재생 버튼 */}
-                <div className="flex justify-end mb-4">
-                  <button
-                    onClick={startPlaylist}
-                    disabled={playlistLoading}
-                    className="btn-primary flex items-center gap-2"
-                  >
-                    {playlistLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
+                <div className="flex justify-end gap-2 mb-4">
+                  {selectMode ? (
+                    <>
+                      <button
+                        onClick={toggleSelectAll}
+                        className="btn-secondary flex items-center gap-2 text-sm"
+                      >
+                        {selectedBookmarkIds.length === bookmarks.length
+                          ? "전체 해제"
+                          : "전체 선택"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectMode(false);
+                          setSelectedBookmarkIds([]);
+                        }}
+                        className="btn-secondary flex items-center gap-2 text-sm"
+                      >
+                        취소
+                      </button>
+                      <button
+                        onClick={startPlaylist}
+                        disabled={
+                          playlistLoading || selectedBookmarkIds.length === 0
+                        }
+                        className="btn-primary flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {playlistLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
+                        재생 ({selectedBookmarkIds.length})
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setSelectMode(true)}
+                      className="btn-primary flex items-center gap-2"
+                    >
                       <Play className="w-4 h-4" />
-                    )}
-                    연속 재생
-                  </button>
+                      연속 재생
+                    </button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                   {bookmarks.map((bookmark) => (
-                    <ContentCard
-                      key={bookmark.bookmarkId}
-                      content={bookmarkToContent(bookmark)}
-                      onCardClick={() => handleContentClick(bookmark)}
-                      simpleHover={true}
-                      onBookmarkToggle={handleBookmarkRemove}
-                    />
+                    <div key={bookmark.bookmarkId} className="relative">
+                      {selectMode && (
+                        <button
+                          onClick={() =>
+                            toggleBookmarkSelect(bookmark.contentId)
+                          }
+                          className={`absolute top-2 left-2 z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            selectedBookmarkIds.includes(bookmark.contentId)
+                              ? "bg-primary border-primary"
+                              : "bg-black/50 border-white/60 hover:border-white"
+                          }`}
+                        >
+                          {selectedBookmarkIds.includes(bookmark.contentId) && (
+                            <span className="text-xs font-bold text-white">
+                              {selectedBookmarkIds.indexOf(bookmark.contentId) +
+                                1}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                      <div
+                        className={
+                          selectMode &&
+                          !selectedBookmarkIds.includes(bookmark.contentId)
+                            ? "opacity-50"
+                            : ""
+                        }
+                      >
+                        <ContentCard
+                          content={bookmarkToContent(bookmark)}
+                          onCardClick={() =>
+                            selectMode
+                              ? toggleBookmarkSelect(bookmark.contentId)
+                              : handleContentClick(bookmark)
+                          }
+                          onPlayClick={
+                            selectMode
+                              ? undefined
+                              : () => handleBookmarkPlay(bookmark)
+                          }
+                          noScale={selectMode}
+                          simpleHover={true}
+                          onBookmarkToggle={
+                            selectMode ? undefined : handleBookmarkRemove
+                          }
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
 

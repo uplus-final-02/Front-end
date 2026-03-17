@@ -76,7 +76,7 @@ const ContentsManagement: React.FC<{
     accessLevel: "FREE",
   });
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [, setThumbnailPreview] = useState<string | null>(null);
   const [allTags, setAllTags] = useState<
     { tagId: number; name: string; priority: number }[]
   >([]);
@@ -412,7 +412,7 @@ const ContentsManagement: React.FC<{
         thumbnailUrl,
         accessLevel: metadataForm.accessLevel,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
-        status: "ACTIVE",
+        status: "HIDDEN",
       });
 
       // 시리즈인 경우 각 에피소드 제목/설명 업데이트
@@ -428,7 +428,7 @@ const ContentsManagement: React.FC<{
                   description: descriptionJson,
                   thumbnailUrl,
                   accessLevel: metadataForm.accessLevel,
-                  status: "ACTIVE",
+                  status: "HIDDEN",
                   episode: {
                     videoId: uploadedEpisodeIds[i],
                     title: ep.title,
@@ -479,7 +479,11 @@ const ContentsManagement: React.FC<{
   const formatStatus = (status: string) => {
     const map: Record<string, { label: string; bg: string; text: string }> = {
       ACTIVE: { label: "활성", bg: "rgba(34,197,94,0.2)", text: "#4ade80" },
-      HIDDEN: { label: "숨김", bg: "rgba(234,179,8,0.25)", text: "#fde047" },
+      HIDDEN: {
+        label: "숨김 (트랜스코딩 대기)",
+        bg: "rgba(234,179,8,0.25)",
+        text: "#fde047",
+      },
       DELETED: { label: "삭제됨", bg: "rgba(239,68,68,0.2)", text: "#f87171" },
     };
     const info = map[status] || {
@@ -778,6 +782,12 @@ const ContentsManagement: React.FC<{
                       <option value="ACTIVE">활성</option>
                       <option value="HIDDEN">숨김</option>
                     </select>
+                    {selectedContent?.status === "HIDDEN" &&
+                      editForm.status === "ACTIVE" && (
+                        <p className="text-yellow-400 text-xs mt-1">
+                          ⚠ 트랜스코딩이 완료되었는지 확인 후 활성화해주세요.
+                        </p>
+                      )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -1003,6 +1013,18 @@ const ContentsManagement: React.FC<{
               </div>
             ) : (
               <div className="space-y-4">
+                {/* 트랜스코딩 대기 안내 */}
+                {selectedContent.status === "HIDDEN" && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                    <p className="text-yellow-400 text-sm font-semibold mb-1">
+                      ⏳ 트랜스코딩 대기 / 진행 중
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      영상 트랜스코딩이 완료되지 않았을 수 있습니다. 트랜스코딩
+                      완료 후 수정 버튼을 눌러 상태를 "활성"으로 변경해주세요.
+                    </p>
+                  </div>
+                )}
                 <div className="flex gap-4">
                   {selectedContent.thumbnailUrl && (
                     <img
@@ -1039,9 +1061,33 @@ const ContentsManagement: React.FC<{
                     <label className="block text-sm text-gray-400 mb-1">
                       설명
                     </label>
-                    <p className="text-sm bg-gray-800 rounded p-3">
-                      {selectedContent.description}
-                    </p>
+                    <div className="text-sm bg-gray-800 rounded p-3 space-y-1">
+                      {(() => {
+                        try {
+                          const parsed = JSON.parse(
+                            selectedContent.description,
+                          );
+                          const labels: Record<string, string> = {
+                            summary: "줄거리",
+                            director: "감독",
+                            actor: "출연",
+                            release: "개봉일",
+                          };
+                          return Object.entries(parsed)
+                            .filter(([, v]) => v)
+                            .map(([key, value]) => (
+                              <p key={key}>
+                                <span className="text-gray-400">
+                                  {labels[key] || key}:
+                                </span>{" "}
+                                {String(value)}
+                              </p>
+                            ));
+                        } catch {
+                          return <p>{selectedContent.description}</p>;
+                        }
+                      })()}
+                    </div>
                   </div>
                 )}
                 {selectedContent.tags.length > 0 && (
@@ -1295,6 +1341,14 @@ const ContentsManagement: React.FC<{
                   <Check className="w-4 h-4" /> 영상 업로드 완료. 메타데이터를
                   입력해주세요.
                 </p>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3 mb-2">
+                  <p className="text-blue-400 text-xs leading-relaxed">
+                    💡 영상이 트랜스코딩 처리 중이므로 콘텐츠는{" "}
+                    <span className="text-yellow-300 font-semibold">숨김</span>{" "}
+                    상태로 등록됩니다. 트랜스코딩 완료 후 콘텐츠 목록에서 상태를
+                    활성으로 변경해주세요.
+                  </p>
+                </div>
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">
                     제목
@@ -1434,20 +1488,13 @@ const ContentsManagement: React.FC<{
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;
                       setThumbnailFile(file);
-                      if (file) {
-                        setThumbnailPreview(URL.createObjectURL(file));
-                      } else {
-                        setThumbnailPreview(null);
-                      }
                     }}
                     className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-primary file:text-white file:text-sm"
                   />
-                  {thumbnailPreview && (
-                    <img
-                      src={thumbnailPreview}
-                      alt="썸네일 미리보기"
-                      className="mt-2 w-full h-32 object-cover rounded"
-                    />
+                  {thumbnailFile && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {thumbnailFile.name}
+                    </p>
                   )}
                 </div>
                 <button
@@ -1463,9 +1510,21 @@ const ContentsManagement: React.FC<{
             {uploadStep === "done" && (
               <div className="text-center py-8">
                 <Check className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                <p className="text-green-400 font-semibold">
+                <p className="text-green-400 font-semibold mb-2">
                   콘텐츠가 등록되었습니다.
                 </p>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mt-4 text-left">
+                  <p className="text-yellow-400 text-sm font-semibold mb-2">
+                    ⏳ 트랜스코딩 진행 중
+                  </p>
+                  <p className="text-gray-400 text-xs leading-relaxed">
+                    영상이 트랜스코딩 처리 중이므로 콘텐츠가{" "}
+                    <span className="text-yellow-300">숨김</span> 상태로
+                    등록되었습니다. 트랜스코딩이 완료된 후 콘텐츠 목록에서
+                    상태를 <span className="text-green-400">활성</span>으로
+                    변경해주세요.
+                  </p>
+                </div>
               </div>
             )}
 

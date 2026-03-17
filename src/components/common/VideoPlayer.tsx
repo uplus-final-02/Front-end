@@ -9,6 +9,8 @@ import {
   Minimize,
   Settings,
   MessageCircle,
+  RotateCcw,
+  RotateCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -42,8 +44,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem("utopia_volume");
+    return saved !== null ? parseFloat(saved) : 1;
+  });
+  const [isMuted, setIsMuted] = useState(() => {
+    return localStorage.getItem("utopia_muted") === "true";
+  });
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -75,6 +82,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (startTime > 0) {
           video.currentTime = startTime;
         }
+        video.volume = volume;
+        video.muted = isMuted;
         if (autoPlay) {
           video.play();
         }
@@ -88,6 +97,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (startTime > 0) {
         video.currentTime = startTime;
       }
+      video.volume = volume;
+      video.muted = isMuted;
       if (autoPlay) {
         video.play();
       }
@@ -156,8 +167,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const vol = parseFloat(e.target.value);
     video.volume = vol;
+    video.muted = false;
     setVolume(vol);
     setIsMuted(vol === 0);
+    localStorage.setItem("utopia_volume", String(vol));
+    localStorage.setItem("utopia_muted", String(vol === 0));
   };
 
   const toggleMute = () => {
@@ -165,6 +179,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!video) return;
     video.muted = !video.muted;
     setIsMuted(!isMuted);
+    localStorage.setItem("utopia_muted", String(!isMuted));
   };
 
   const changePlaybackRate = (rate: number) => {
@@ -180,6 +195,36 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onToggleFullscreen();
     }
   };
+
+  const skipTime = (seconds: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.max(
+      0,
+      Math.min(video.duration, video.currentTime + seconds),
+    );
+    setCurrentTime(video.currentTime);
+  };
+
+  useEffect(() => {
+    if (shortsMode) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        skipTime(-10);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        skipTime(10);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [shortsMode]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -275,6 +320,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <span className="text-sm">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
+
+                <button
+                  onClick={() => skipTime(-10)}
+                  className="hover:text-primary transition-colors"
+                  title="10초 되감기 (←)"
+                >
+                  <RotateCcw className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => skipTime(10)}
+                  className="hover:text-primary transition-colors"
+                  title="10초 넘기기 (→)"
+                >
+                  <RotateCw className="w-5 h-5" />
+                </button>
               </div>
 
               <div className="flex items-center space-x-4">
@@ -387,8 +447,11 @@ const ShortsControls: React.FC<ShortsControlsProps> = ({
         Math.min(1, (clientX - rect.left) / rect.width),
       );
       video.volume = ratio;
+      video.muted = false;
       setVolume(ratio);
       setIsMuted(ratio === 0);
+      localStorage.setItem("utopia_volume", String(ratio));
+      localStorage.setItem("utopia_muted", String(ratio === 0));
     },
     [videoRef, setVolume, setIsMuted],
   );

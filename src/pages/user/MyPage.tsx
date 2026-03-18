@@ -1181,6 +1181,8 @@ const MyPage: React.FC = () => {
                               ? toggleBookmarkSelect(bookmark.contentId)
                               : handleContentClick(bookmark)
                           }
+                          onPlayClick={() => handleBookmarkPlay(bookmark)}
+                          simpleHover={!selectMode}
                           noScale={selectMode}
                           onBookmarkToggle={
                             selectMode ? undefined : handleBookmarkRemove

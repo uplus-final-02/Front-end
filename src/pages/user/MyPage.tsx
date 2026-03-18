@@ -112,8 +112,9 @@ const MyPage: React.FC = () => {
     useState<UserContentWatchHistoryGroup | null>(null);
 
   // 크리에이터 영상 재생
-  const [playingVideo, setPlayingVideo] =
-    useState<UserContentPlayInfo | null>(null);
+  const [playingVideo, setPlayingVideo] = useState<UserContentPlayInfo | null>(
+    null,
+  );
   const [videoLoading, setVideoLoading] = useState(false);
 
   // 구독 관련
@@ -197,7 +198,6 @@ const MyPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await bookmarkService.getBookmarks(cursor, 20);
-      console.log("북마크 데이터:", data); // 디버깅용
       if (cursor) {
         // 더보기
         setBookmarks((prev) => [...prev, ...data.bookmarks]);

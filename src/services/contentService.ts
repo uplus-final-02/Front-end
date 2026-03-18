@@ -1,9 +1,6 @@
 import apiClient from "./apiClient";
 import { Content } from "@/types";
 
-// 개발 모드: Mock 사용 여부
-const USE_MOCK = false; // 콘텐츠 API는 실제 API 사용
-
 // 백엔드 응답 → Content 변환 헬퍼
 const mapContentItem = (item: any): Content => {
   const rawType =
@@ -51,22 +48,6 @@ const mapContentItem = (item: any): Content => {
   };
 };
 
-// Mock 데이터
-const mockContents: Content[] = [
-  {
-    id: "1",
-    title: "액션 영화 1",
-    thumbnail: "https://picsum.photos/seed/movie1/400/225",
-    type: "movie",
-    category: "액션",
-    tags: ["액션", "스릴러"],
-    rating: 4.5,
-    year: 2024,
-    duration: "2시간 15분",
-  },
-  // ... 더 많은 Mock 데이터
-];
-
 export const contentService = {
   getTags: async (
     section: "LEVEL_0" | "LEVEL_1",
@@ -85,11 +66,6 @@ export const contentService = {
 
   // 실시간 인기 차트 조회
   getTrendingContents: async (limit: number = 10): Promise<Content[]> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return mockContents.slice(0, limit);
-    }
-
     try {
       const response = await apiClient.get("/api/contents/home/trending", {
         params: { limit },
@@ -135,14 +111,6 @@ export const contentService = {
     items: Content[];
     hasMore: boolean;
   }> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return {
-        items: mockContents.slice(0, extended ? 50 : 15),
-        hasMore: !extended,
-      };
-    }
-
     try {
       const response = await apiClient.get("/api/contents/recommended", {
         params: { extended },
@@ -171,11 +139,6 @@ export const contentService = {
     page?: number;
     size?: number;
   }): Promise<Content[]> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return mockContents;
-    }
-
     try {
       const response = await apiClient.get("/api/contents/home/default-list", {
         params,
@@ -190,11 +153,6 @@ export const contentService = {
 
   // 시청 중인 콘텐츠 조회
   getWatchingContentList: async (): Promise<Content[]> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return mockContents.slice(0, 3);
-    }
-
     try {
       const response = await apiClient.get("/api/contents/home/watching-list");
 
@@ -207,11 +165,6 @@ export const contentService = {
 
   // 찜 목록 조회
   getBookmarkList: async (): Promise<Content[]> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return mockContents.slice(0, 5);
-    }
-
     try {
       const response = await apiClient.get("/api/contents/home/bookmark-list");
 
@@ -224,13 +177,6 @@ export const contentService = {
 
   // 콘텐츠 상세 조회 (ID로)
   getContentById: async (contentId: string): Promise<Content> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      const found = mockContents.find((c) => c.id === contentId);
-      if (!found) throw new Error("콘텐츠를 찾을 수 없습니다");
-      return found;
-    }
-
     try {
       const response = await apiClient.get(`/api/contents/${contentId}`);
       const item = response.data;
@@ -258,7 +204,6 @@ export const contentService = {
         episodes = episodesResponse.data.episodes || [];
       } catch (error) {
         // SINGLE 콘텐츠이거나 에피소드가 없는 경우
-        console.log("에피소드 조회 불가 (단일 콘텐츠일 수 있음)");
       }
 
       return {
@@ -284,29 +229,8 @@ export const contentService = {
     }
   },
 
-  // 콘텐츠 상세 조회
-  // getContentDetail: async (contentId: string): Promise<any> => {
-  //   if (USE_MOCK) {
-  //     await new Promise((resolve) => setTimeout(resolve, 300));
-  //     return mockContents.find((c) => c.id === contentId);
-  //   }
-
-  //   try {
-  //     const response = await apiClient.get(`/api/contents/${contentId}`);
-  //     return response.data;
-  //   } catch (error) {
-  //     console.error("콘텐츠 상세 조회 실패:", error);
-  //     throw error;
-  //   }
-  // },
-
   // 에피소드 목록 조회
   getEpisodes: async (contentId: string): Promise<any[]> => {
-    if (USE_MOCK) {
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return [];
-    }
-
     try {
       const response = await apiClient.get(
         `/api/contents/${contentId}/episodes-list`,
@@ -349,41 +273,6 @@ export const contentService = {
       return true;
     }
   },
-
-  // 댓글 조회
-  // getComments: async (
-  //     videoId: number | string,
-  //     page: number = 0,
-  //     size: number = 20,
-  //   ): Promise<CommentPage> => {
-  //     const response = await apiClient.get(`/api/videos/${videoId}/comments`, {
-  //       params: { page, size },
-  //     });
-  //     return response.data.data;
-  //   },
-
-  // 댓글 작성
-  // addComment: async (
-  //   contentId: string,
-  //   userId: string,
-  //   userName: string,
-  //   content: string,
-  //   episodeId?: string,
-  // ): Promise<any> => {
-  //   const comments = JSON.parse(localStorage.getItem("ott_comments") || "[]");
-  //   const newComment = {
-  //     id: `comment-${Date.now()}`,
-  //     contentId,
-  //     episodeId,
-  //     userId,
-  //     userName,
-  //     content,
-  //     createdAt: new Date().toISOString(),
-  //   };
-  //   comments.unshift(newComment);
-  //   localStorage.setItem("ott_comments", JSON.stringify(comments));
-  //   return newComment;
-  // },
 
   // 시청 이력 조회
   getWatchHistory: async (userId: string): Promise<any[]> => {

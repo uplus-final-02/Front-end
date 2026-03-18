@@ -10,6 +10,7 @@ import {
   Search,
   ArrowLeft,
   Plus,
+  Play,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { creatorService, FeedItem } from "@/services/creatorService";
@@ -408,33 +409,35 @@ const StudioPage: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
                 {myUploads.map((item) => (
                   <div
                     key={item.userContentId}
-                    className="bg-gray-900 rounded-lg overflow-hidden"
+                    className="cursor-pointer group"
+                    onClick={() => navigate(`/creator/${item.userContentId}`)}
                   >
-                    <div className="aspect-video bg-gray-800 relative overflow-hidden">
+                    <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800 mb-2 transition-all duration-300 group-hover:ring-2 ring-primary">
                       {item.thumbnailUrl ? (
                         <img
                           src={item.thumbnailUrl}
                           alt={item.title}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <Video className="w-8 h-8 text-gray-600" />
                         </div>
                       )}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play className="w-10 h-10" />
+                      </div>
                     </div>
-                    <div className="p-3">
-                      <p className="text-sm font-medium line-clamp-2 mb-1">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        조회수 {(item.totalViewCount ?? 0).toLocaleString()}회
-                      </p>
-                    </div>
+                    <h3 className="text-sm font-semibold truncate">
+                      {item.title}
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      조회수 {(item.totalViewCount ?? 0).toLocaleString()}회
+                    </p>
                   </div>
                 ))}
               </div>
@@ -632,7 +635,7 @@ const StudioPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  비디오 파일 * (1-5분 권장)
+                  비디오 파일 * (최대 3분)
                 </label>
                 <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center hover:border-primary transition-colors">
                   <input
@@ -703,9 +706,7 @@ const StudioPage: React.FC = () => {
               <div className="bg-gray-800 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">업로드 가이드</h3>
                 <ul className="text-sm text-gray-400 space-y-1">
-                  <li>• 비디오 길이: 1-5분 권장</li>
-                  <li>• 파일 크기: 최대 500MB</li>
-                  <li>• 해상도: 최소 720p 권장</li>
+                  <li>• 비디오 길이: 최대 3분(180초)</li>
                   <li>• 업로드 후 트랜스코딩이 완료되면 자동 게시됩니다</li>
                   <li>• 저작권을 침해하는 콘텐츠는 삭제될 수 있습니다</li>
                 </ul>

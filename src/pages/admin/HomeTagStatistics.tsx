@@ -64,12 +64,18 @@ const HomeTagStatistics: React.FC = () => {
   }, [selectedDate]);
 
   const summary = useMemo(() => {
-    const totalViewCount = stats.reduce((sum, item) => sum + item.totalViewCount, 0);
+    const totalViewCount = stats.reduce(
+      (sum, item) => sum + item.totalViewCount,
+      0,
+    );
     const totalBookmarkCount = stats.reduce(
       (sum, item) => sum + item.totalBookmarkCount,
       0,
     );
-    const totalWatchCount = stats.reduce((sum, item) => sum + item.totalWatchCount, 0);
+    const totalWatchCount = stats.reduce(
+      (sum, item) => sum + item.totalWatchCount,
+      0,
+    );
     const completedWatchCount = stats.reduce(
       (sum, item) => sum + item.completedWatchCount,
       0,
@@ -93,8 +99,9 @@ const HomeTagStatistics: React.FC = () => {
 
   const filteredStats = useMemo(() => {
     return stats.filter((item) => {
-      const matchesKeyword =
-        item.tagName.toLowerCase().includes(searchKeyword.toLowerCase());
+      const matchesKeyword = item.tagName
+        .toLowerCase()
+        .includes(searchKeyword.toLowerCase());
       const matchesWatchCount = item.totalWatchCount >= minWatchCount;
       return matchesKeyword && matchesWatchCount;
     });
@@ -178,12 +185,15 @@ const HomeTagStatistics: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold">홈 노출 태그 성과 대시보드</h2>
             <p className="mt-2 text-sm text-gray-400">
-              홈 노출(priority=1) 태그의 성과 지표를 KPI 요약 → 태그별 비교 → 상세 분석 흐름으로 제공합니다.
+              홈 노출(priority=1) 태그의 성과 지표를 KPI 요약 → 태그별 비교 →
+              상세 분석 흐름으로 제공합니다.
             </p>
           </div>
 
           <div>
-            <label className="mb-2 block text-xs text-gray-400">기준 날짜</label>
+            <label className="mb-2 block text-xs text-gray-400">
+              기준 날짜
+            </label>
             <input
               type="date"
               value={selectedDate}
@@ -230,11 +240,15 @@ const HomeTagStatistics: React.FC = () => {
           <InsightBanner
             topViewTag={insight.topView?.tagName}
             topViewValue={
-              insight.topView ? formatNumber(insight.topView.totalViewCount) : "-"
+              insight.topView
+                ? formatNumber(insight.topView.totalViewCount)
+                : "-"
             }
             topBookmarkTag={insight.topBookmark?.tagName}
             topBookmarkValue={
-              insight.topBookmark ? formatRate(insight.topBookmark.bookmarkRate) : "-"
+              insight.topBookmark
+                ? formatRate(insight.topBookmark.bookmarkRate)
+                : "-"
             }
             topCompletionTag={insight.topCompletion?.tagName}
             topCompletionValue={
@@ -286,19 +300,28 @@ const HomeTagStatistics: React.FC = () => {
                     stroke="#9CA3AF"
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => formatCompactNumber(Number(value))}
+                    tickFormatter={(value) =>
+                      formatCompactNumber(Number(value))
+                    }
                   />
                   <Tooltip
-                    formatter={(value) => [formatNumber(Number(value ?? 0)), "조회수"]}
+                    formatter={(value) => [
+                      formatNumber(Number(value ?? 0)),
+                      "조회수",
+                    ]}
                     contentStyle={{
-                        backgroundColor: "#111827",
-                        border: "1px solid #374151",
-                        borderRadius: "12px",
-                        color: "#fff",
+                      backgroundColor: "#111827",
+                      border: "1px solid #374151",
+                      borderRadius: "12px",
+                      color: "#fff",
                     }}
                     cursor={{ fill: "rgba(255,255,255,0.04)" }}
                   />
-                  <Bar dataKey="totalViewCount" radius={[10, 10, 0, 0]} />
+                  <Bar
+                    dataKey="totalViewCount"
+                    fill="#EB008B"
+                    radius={[10, 10, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -309,7 +332,8 @@ const HomeTagStatistics: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold">상세 데이터</h3>
                 <p className="text-sm text-gray-400">
-                  필요할 때만 펼쳐서 검색, 필터, 정렬 기준으로 상세 지표를 확인합니다.
+                  필요할 때만 펼쳐서 검색, 필터, 정렬 기준으로 상세 지표를
+                  확인합니다.
                 </p>
               </div>
 
@@ -377,13 +401,27 @@ const HomeTagStatistics: React.FC = () => {
                   <table className="w-full min-w-[920px]">
                     <thead className="bg-gray-800">
                       <tr>
-                        <th className="px-5 py-4 text-left text-sm font-semibold">태그</th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold">조회수</th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold">북마크</th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold">북마크율</th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold">시청</th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold">완료</th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold">완료율</th>
+                        <th className="px-5 py-4 text-left text-sm font-semibold">
+                          태그
+                        </th>
+                        <th className="px-5 py-4 text-left text-sm font-semibold">
+                          조회수
+                        </th>
+                        <th className="px-5 py-4 text-left text-sm font-semibold">
+                          북마크
+                        </th>
+                        <th className="px-5 py-4 text-left text-sm font-semibold">
+                          북마크율
+                        </th>
+                        <th className="px-5 py-4 text-left text-sm font-semibold">
+                          시청
+                        </th>
+                        <th className="px-5 py-4 text-left text-sm font-semibold">
+                          완료
+                        </th>
+                        <th className="px-5 py-4 text-left text-sm font-semibold">
+                          완료율
+                        </th>
                       </tr>
                     </thead>
 
@@ -420,7 +458,9 @@ const HomeTagStatistics: React.FC = () => {
                               {formatNumber(item.totalBookmarkCount)}
                             </td>
                             <td className="px-5 py-4 text-sm">
-                              <RateBadge value={formatRate(item.bookmarkRate)} />
+                              <RateBadge
+                                value={formatRate(item.bookmarkRate)}
+                              />
                             </td>
                             <td className="px-5 py-4 text-sm">
                               {item.totalWatchCount === 0 ? (
@@ -440,7 +480,9 @@ const HomeTagStatistics: React.FC = () => {
                               {item.totalWatchCount === 0 ? (
                                 <span className="text-gray-500">-</span>
                               ) : (
-                                <RateBadge value={formatRate(item.completionRate)} />
+                                <RateBadge
+                                  value={formatRate(item.completionRate)}
+                                />
                               )}
                             </td>
                           </tr>
@@ -503,7 +545,9 @@ const InsightBanner = ({
   return (
     <section className="grid grid-cols-1 gap-3 xl:grid-cols-3">
       <div className="rounded-2xl border border-gray-800 bg-gray-900/70 px-5 py-4">
-        <p className="text-xs uppercase tracking-wide text-gray-400">Top View</p>
+        <p className="text-xs uppercase tracking-wide text-gray-400">
+          Top View
+        </p>
         <p className="mt-2 text-base font-semibold text-white">
           {topViewTag ?? "-"}
         </p>

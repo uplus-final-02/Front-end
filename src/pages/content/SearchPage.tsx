@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Search, Loader2 } from "lucide-react";
 import { Content } from "@/types";
 import { searchService, type SearchParams } from "@/services/searchService";
@@ -7,6 +7,7 @@ import ContentCard from "@/components/content/ContentCard";
 import ContentModal from "@/components/content/ContentModal";
 
 type SortType = "RELATED" | "LATEST" | "POPULAR";
+type SearchTab = "ott" | "creator";
 
 const PAGE_SIZE = 15;
 
@@ -26,6 +27,18 @@ const SearchPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  // 탭
+  const [activeTab, setActiveTab] = useState<SearchTab>("ott");
+
+  // 크리에이터 검색 결과
+  const [creatorResults, setCreatorResults] = useState<Content[]>([]);
+  const [creatorHasNext, setCreatorHasNext] = useState(false);
+  const [creatorPage, setCreatorPage] = useState(0);
+  const [creatorLoading, setCreatorLoading] = useState(false);
+  const [creatorLoadingMore, setCreatorLoadingMore] = useState(false);
+
+  const navigate = useNavigate();
 
   // 자동완성
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -104,12 +117,43 @@ const SearchPage: React.FC = () => {
     [],
   );
 
+  // 크리에이터 검색
+  const doCreatorSearch = useCallback(
+    async (query: string, pageNum: number, append: boolean = false) => {
+      if (!query.trim()) {
+        setCreatorResults([]);
+        setCreatorHasNext(false);
+        return;
+      }
+      append ? setCreatorLoadingMore(true) : setCreatorLoading(true);
+      try {
+        const data = await searchService.searchCreator(
+          query.trim(),
+          pageNum,
+          PAGE_SIZE,
+        );
+        setCreatorResults((prev) =>
+          append ? [...prev, ...data.contents] : data.contents,
+        );
+        setCreatorHasNext(data.hasNext);
+        setCreatorPage(pageNum);
+      } catch {
+        if (!append) setCreatorResults([]);
+      } finally {
+        setCreatorLoading(false);
+        setCreatorLoadingMore(false);
+      }
+    },
+    [],
+  );
+
   // 초기 로드 & URL 파라미터 변경 시
   useEffect(() => {
     // URL에 쿼리나 태그가 있을 때만 자동 검색
     if (initialQuery || initialTag) {
       setSelectedTag(initialTag || undefined);
       doSearch(initialQuery, initialTag || undefined, sortType, 0);
+      if (initialQuery) doCreatorSearch(initialQuery, 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery, initialTag]);
@@ -120,25 +164,27 @@ const SearchPage: React.FC = () => {
     doSearch(searchQuery, selectedTag, sort, 0);
   };
 
-  // 태그 클릭
+  // 태그 클릭 (토글)
   const handleTagClick = (tagName: string) => {
-    setSelectedTag(tagName);
+    const newTag = selectedTag === tagName ? undefined : tagName;
+    setSelectedTag(newTag);
     const params: Record<string, string> = {};
     if (searchQuery.trim()) params.q = searchQuery;
-    params.tag = tagName;
+    if (newTag) params.tag = newTag;
     setSearchParams(params);
-    doSearch(searchQuery, tagName, sortType, 0);
+    doSearch(searchQuery, newTag, sortType, 0);
   };
 
   // 검색 폼 제출
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setShowSuggestions(false);
+    setSelectedTag(undefined);
     const params: Record<string, string> = {};
     if (searchQuery.trim()) params.q = searchQuery;
-    if (selectedTag) params.tag = selectedTag;
     setSearchParams(params);
-    doSearch(searchQuery, selectedTag, sortType, 0);
+    doSearch(searchQuery, undefined, sortType, 0);
+    if (searchQuery.trim()) doCreatorSearch(searchQuery, 0);
   };
 
   // 더보기
@@ -172,8 +218,10 @@ const SearchPage: React.FC = () => {
   const handleSuggestionClick = (text: string) => {
     setSearchQuery(text);
     setShowSuggestions(false);
-    setSearchParams({ q: text, ...(selectedTag ? { tag: selectedTag } : {}) });
-    doSearch(text, selectedTag, sortType, 0);
+    setSelectedTag(undefined);
+    setSearchParams({ q: text });
+    doSearch(text, undefined, sortType, 0);
+    doCreatorSearch(text, 0);
   };
 
   const hasSearchQuery =
@@ -243,90 +291,206 @@ const SearchPage: React.FC = () => {
           </div>
         </section>
 
-        {/* 정렬 */}
-        <section className="mb-6 flex items-center justify-between">
-          {hasSearchQuery && (
-            <p className="text-gray-400 text-sm">
-              {message || `검색 결과 ${results.length}개`}
-            </p>
-          )}
-          <div className="flex gap-2 ml-auto">
-            {(["RELATED", "LATEST", "POPULAR"] as SortType[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => handleSortChange(s)}
-                className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                  sortType === s
-                    ? "bg-primary text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                }`}
-              >
-                {s === "RELATED"
-                  ? "관련도순"
-                  : s === "LATEST"
-                    ? "최신순"
-                    : "인기순"}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* 콘텐츠 그리드 */}
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-gray-400">검색 중...</p>
-            </div>
-          </div>
-        ) : error ? (
-          <div className="text-center py-20">
-            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-red-400" />
-            </div>
-            <p className="text-red-400 mb-2">{error}</p>
+        {/* 탭 */}
+        {hasSearchQuery && (
+          <div className="mb-6 flex gap-4 border-b border-gray-800">
             <button
-              onClick={() => doSearch(searchQuery, selectedTag, sortType, 0)}
-              className="btn-secondary mt-4"
+              onClick={() => setActiveTab("ott")}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                activeTab === "ott"
+                  ? "text-primary"
+                  : "text-gray-400 hover:text-white"
+              }`}
             >
-              다시 시도
+              OTT 콘텐츠 {results.length > 0 && `(${results.length})`}
+              {activeTab === "ott" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("creator")}
+              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+                activeTab === "creator"
+                  ? "text-primary"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              크리에이터{" "}
+              {creatorResults.length > 0 && `(${creatorResults.length})`}
+              {activeTab === "creator" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+              )}
             </button>
           </div>
-        ) : results.length === 0 ? (
-          <div className="text-center py-20">
-            <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-xl text-gray-400 mb-2">
-              {hasSearchQuery
-                ? "검색 결과가 없습니다."
-                : "검색어를 입력하거나 태그를 선택해보세요."}
-            </p>
+        )}
+
+        {/* 정렬 (OTT 탭에서만) */}
+        {activeTab === "ott" && (
+          <section className="mb-6 flex items-center justify-between">
             {hasSearchQuery && (
-              <p className="text-gray-500">다른 검색어를 시도해보세요.</p>
+              <p className="text-gray-400 text-sm">
+                {message || `검색 결과 ${results.length}개`}
+              </p>
             )}
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {results.map((content) => (
-                <ContentCard
-                  key={content.id}
-                  content={content}
-                  onCardClick={setSelectedContent}
-                />
+            <div className="flex gap-2 ml-auto">
+              {(["RELATED", "LATEST", "POPULAR"] as SortType[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => handleSortChange(s)}
+                  className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                    sortType === s
+                      ? "bg-primary text-white"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  }`}
+                >
+                  {s === "RELATED"
+                    ? "관련도순"
+                    : s === "LATEST"
+                      ? "최신순"
+                      : "인기순"}
+                </button>
               ))}
             </div>
+          </section>
+        )}
 
-            {hasNext && (
-              <div className="text-center mt-8">
+        {/* OTT 콘텐츠 그리드 */}
+        {activeTab === "ott" && (
+          <>
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="text-center">
+                  <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-gray-400">검색 중...</p>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="text-center py-20">
+                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-red-400" />
+                </div>
+                <p className="text-red-400 mb-2">{error}</p>
                 <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="btn-secondary px-8 py-2.5 flex items-center gap-2 mx-auto"
+                  onClick={() =>
+                    doSearch(searchQuery, selectedTag, sortType, 0)
+                  }
+                  className="btn-secondary mt-4"
                 >
-                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loadingMore ? "로딩 중..." : "더보기"}
+                  다시 시도
                 </button>
               </div>
+            ) : results.length === 0 ? (
+              <div className="text-center py-20">
+                <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-xl text-gray-400 mb-2">
+                  {hasSearchQuery
+                    ? "검색 결과가 없습니다."
+                    : "검색어를 입력하거나 태그를 선택해보세요."}
+                </p>
+                {hasSearchQuery && (
+                  <p className="text-gray-500">다른 검색어를 시도해보세요.</p>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                  {results.map((content) => (
+                    <ContentCard
+                      key={content.id}
+                      content={content}
+                      onCardClick={setSelectedContent}
+                    />
+                  ))}
+                </div>
+
+                {hasNext && (
+                  <div className="text-center mt-8">
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className="btn-secondary px-8 py-2.5 flex items-center gap-2 mx-auto"
+                    >
+                      {loadingMore && (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
+                      {loadingMore ? "로딩 중..." : "더보기"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* 크리에이터 콘텐츠 그리드 */}
+        {activeTab === "creator" && (
+          <>
+            {creatorLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="text-center">
+                  <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <p className="text-gray-400">검색 중...</p>
+                </div>
+              </div>
+            ) : creatorResults.length === 0 ? (
+              <div className="text-center py-20">
+                <Search className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-xl text-gray-400 mb-2">
+                  {searchQuery.trim()
+                    ? "크리에이터 영상 검색 결과가 없습니다."
+                    : "검색어를 입력해보세요."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-400 text-sm mb-4">
+                  크리에이터 영상 {creatorResults.length}개
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  {creatorResults.map((item) => (
+                    <div
+                      key={item.id}
+                      className="cursor-pointer group"
+                      onClick={() => navigate(`/creator/${item.id}`)}
+                    >
+                      <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800">
+                        <img
+                          src={item.thumbnailUrl || item.thumbnail}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23374151' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%239CA3AF' font-size='12'%3E영상%3C/text%3E%3C/svg%3E";
+                          }}
+                        />
+                      </div>
+                      <p className="mt-2 text-sm text-white truncate">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        조회수 {(item.viewCount ?? 0).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {creatorHasNext && (
+                  <div className="text-center mt-8">
+                    <button
+                      onClick={() =>
+                        doCreatorSearch(searchQuery, creatorPage + 1, true)
+                      }
+                      disabled={creatorLoadingMore}
+                      className="btn-secondary px-8 py-2.5 flex items-center gap-2 mx-auto"
+                    >
+                      {creatorLoadingMore && (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
+                      {creatorLoadingMore ? "로딩 중..." : "더보기"}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

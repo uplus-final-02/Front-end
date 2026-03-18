@@ -45,6 +45,9 @@ const Header: React.FC = () => {
             <Link to="/" className="hover:text-primary transition-colors">
               홈
             </Link>
+            <Link to="/all" className="hover:text-primary transition-colors">
+              전체
+            </Link>
             <Link
               to="/original"
               className="hover:text-primary transition-colors"
@@ -160,6 +163,13 @@ const Header: React.FC = () => {
                 className="hover:text-primary transition-colors"
               >
                 홈
+              </Link>
+              <Link
+                to="/all"
+                onClick={() => setShowMobileMenu(false)}
+                className="hover:text-primary transition-colors"
+              >
+                전체
               </Link>
               <Link
                 to="/original"

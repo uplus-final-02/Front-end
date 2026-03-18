@@ -2,7 +2,8 @@
 
 > LG U+ 고객 맞춤형 숏폼 OTT 플랫폼 — 1~5분 짧은 러닝타임 콘텐츠 스트리밍 서비스
 
-<img width="1733" height="946" alt="U-TOPIA 메인" src="https://github.com/user-attachments/assets/e81ef804-bec4-4e71-b81d-78344e6beaef" />
+<img width="1918" height="948" alt="image" src="https://github.com/user-attachments/assets/91293ddf-92bf-4e94-a196-f31e3b01e6a6" />
+
 
 ## 배포
 

@@ -166,12 +166,12 @@ const ContentCard: React.FC<ContentCardProps> = ({
             )}
           </div>
           {simpleHover ? (
-            // 간소화 모드: 제목 + 재생/찜하기 버튼만
+            // 간소화 모드: 제목 + 재생 버튼만
             <div className="p-4">
               <h3 className="font-semibold text-lg mb-3 line-clamp-1">
                 {content.title}
               </h3>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -184,12 +184,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
                   className="flex-1 bg-white text-black px-4 py-2 rounded font-semibold hover:bg-gray-200 transition-colors text-sm"
                 >
                   재생
-                </button>
-                <button
-                  onClick={handleBookmarkClick}
-                  className="w-10 h-10 flex items-center justify-center bg-gray-800 hover:bg-gray-700 rounded-full transition-colors"
-                >
-                  <Bookmark className="w-5 h-5 fill-current" />
                 </button>
               </div>
             </div>

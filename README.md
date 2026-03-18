@@ -4,6 +4,10 @@
 
 <img width="1733" height="946" alt="U-TOPIA 메인" src="https://github.com/user-attachments/assets/e81ef804-bec4-4e71-b81d-78344e6beaef" />
 
+## 배포
+
+🔗 [https://utopiaott.vercel.app](https://utopiaott.vercel.app)
+
 ## 프로젝트 소개
 
 U-TOPIA는 출퇴근길, 점심시간 등 짧은 시간에 즐길 수 있는 프리미엄 숏폼 콘텐츠를 제공하는 OTT 플랫폼입니다. 관리자가 업로드하는 OTT 콘텐츠와 크리에이터가 직접 제작하는 유저 콘텐츠를 모두 지원하며, 개인화 추천과 실시간 인기 차트를 통해 사용자 맞춤형 경험을 제공합니다.

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Clock, Eye, Bookmark } from "lucide-react";
+import { Eye, Bookmark } from "lucide-react";
 import { Content } from "@/types";
 
 interface ContentCardProps {
@@ -23,14 +23,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
-
-  const formatDuration = (duration: number | string | undefined) => {
-    if (!duration) return "0:00";
-    if (typeof duration === "string") return duration;
-    const mins = Math.floor(duration / 60);
-    const secs = duration % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
 
   // 안전한 필드 접근
   const thumbnailUrl = content.thumbnailUrl || content.thumbnail || "";
@@ -58,10 +50,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
             alt={content.title}
             className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
           />
-          <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs flex items-center space-x-1">
-            <Clock className="w-3 h-3" />
-            <span>{formatDuration(content.duration)}</span>
-          </div>
           {content.isOriginal && (
             <div className="absolute top-2 left-2 bg-primary px-2 py-1 rounded text-xs font-bold">
               오리지널
@@ -190,10 +178,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
               </p>
               <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
                 <div className="flex items-center space-x-3">
-                  <span className="flex items-center space-x-1">
-                    <Clock className="w-3 h-3" />
-                    <span>{formatDuration(content.duration)}</span>
-                  </span>
                   <span className="flex items-center space-x-1">
                     <Eye className="w-3 h-3" />
                     <span>{viewCount.toLocaleString()}</span>

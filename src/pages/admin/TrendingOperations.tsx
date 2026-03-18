@@ -9,14 +9,17 @@ import {
   Eye,
   Bookmark,
   PlayCircle,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { adminService } from "@/services/adminService";
 import type {
   AdminMetricsDashboard,
-  AdminMetricsDashboardBucketSummary,
-  AdminMetricsDashboardTrendingSummary,
-  AdminMetricsDashboardVerifySummary,
+  AdminMetricsDashboardBucketItem,
+  AdminMetricsDashboardHourItem,
   AdminTrendingDetailItem,
 } from "@/types";
 import { ADMIN_JOB_STATUS_MAP } from "@/types";
@@ -28,6 +31,8 @@ const TrendingOperations: React.FC = () => {
   const [selectedCalculatedAt, setSelectedCalculatedAt] = useState<string>("");
   const [detailItems, setDetailItems] = useState<AdminTrendingDetailItem[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [showAllBuckets, setShowAllBuckets] = useState(false);
+  const [hoursPanelCollapsed, setHoursPanelCollapsed] = useState(false);
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -35,8 +40,8 @@ const TrendingOperations: React.FC = () => {
       const data = await adminService.getMetricsDashboard();
       setDashboard(data);
 
-      if (!selectedCalculatedAt && data.trendingSummaries.length > 0) {
-        setSelectedCalculatedAt(data.trendingSummaries[0].calculatedAt);
+      if (!selectedCalculatedAt && data.hours.length > 0) {
+        setSelectedCalculatedAt(data.hours[0].calculatedAt);
       }
     } catch (error) {
       console.error("인기차트 운영 대시보드 조회 실패:", error);
@@ -55,7 +60,16 @@ const TrendingOperations: React.FC = () => {
         calculatedAt,
         limit: 20,
       });
-      setDetailItems(data.items);
+
+      const normalizedItems = (data.items ?? []).map((item: any) => ({
+        ...item,
+        score: item.score ?? 0,
+        viewDelta: item.viewDelta ?? 0,
+        bookmarkDelta: item.bookmarkDelta ?? 0,
+        completedDelta: item.completedDelta ?? 0,
+      }));
+
+      setDetailItems(normalizedItems);
     } catch (error) {
       console.error("트렌딩 상세 조회 실패:", error);
       setDetailItems([]);
@@ -74,41 +88,59 @@ const TrendingOperations: React.FC = () => {
     }
   }, [selectedCalculatedAt]);
 
-  const dashboardSummary = useMemo(() => {
-    const bucketSummaries = dashboard?.bucketSummaries ?? [];
-    const trendingSummaries = dashboard?.trendingSummaries ?? [];
-    const verifySummaries = dashboard?.verifySummaries ?? [];
+  const selectedHour = useMemo(() => {
+    if (!dashboard?.hours?.length) return null;
+    return (
+      dashboard.hours.find(
+        (item) => item.calculatedAt === selectedCalculatedAt,
+      ) ??
+      dashboard.hours[0] ??
+      null
+    );
+  }, [dashboard, selectedCalculatedAt]);
 
-    const successBuckets = bucketSummaries.filter(
+  const dashboardSummary = useMemo(() => {
+    const buckets = dashboard?.buckets ?? [];
+    const hours = dashboard?.hours ?? [];
+
+    const successBuckets = buckets.filter(
       (item) => item.jobStatus === "SUCCESS",
     ).length;
-    const emptyBuckets = bucketSummaries.filter(
+    const emptyBuckets = buckets.filter(
       (item) => item.jobStatus === "EMPTY",
     ).length;
-    const failedBuckets = bucketSummaries.filter(
+    const failedBuckets = buckets.filter(
       (item) => item.jobStatus === "FAILED",
     ).length;
 
-    const latestTrending = trendingSummaries[0] ?? null;
-    const latestVerify = verifySummaries[0] ?? null;
+    const latestTrending = hours[0] ?? null;
+    const mismatchHours = hours.filter((item) => item.mismatch).length;
 
     return {
       successBuckets,
       emptyBuckets,
       failedBuckets,
       latestTrending,
-      latestVerify,
+      mismatchHours,
     };
   }, [dashboard]);
+
+  const visibleBuckets = useMemo(() => {
+    const buckets = dashboard?.buckets ?? [];
+    return showAllBuckets ? buckets : buckets.slice(0, 5);
+  }, [dashboard, showAllBuckets]);
 
   return (
     <div className="space-y-6">
       <SectionCard>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 className="text-2xl font-bold">인기차트 운영 대시보드</h2>
+            <h2 className="text-2xl font-bold text-white">
+              인기차트 운영 대시보드
+            </h2>
             <p className="mt-2 text-sm text-gray-400">
-              최근 24시간 집계 상태, 정각 트렌딩 실행 결과, 검증 요약을 함께 확인합니다.
+              최근 24시간 스냅샷 버킷, 정각 트렌딩 실행 결과, 상세 순위를
+              한 화면에서 확인합니다.
             </p>
           </div>
 
@@ -137,12 +169,6 @@ const TrendingOperations: React.FC = () => {
               description="최근 24시간 SUCCESS 버킷 수"
             />
             <KpiCard
-              icon={<MinusCircle className="h-5 w-5" />}
-              title="버킷 변화 없음"
-              value={String(dashboardSummary.emptyBuckets)}
-              description="최근 24시간 EMPTY 버킷 수"
-            />
-            <KpiCard
               icon={<AlertTriangle className="h-5 w-5" />}
               title="버킷 실패"
               value={String(dashboardSummary.failedBuckets)}
@@ -152,110 +178,112 @@ const TrendingOperations: React.FC = () => {
               icon={<Trophy className="h-5 w-5" />}
               title="최신 트렌딩 건수"
               value={String(
-                dashboardSummary.latestTrending?.trendingHistoryCount ?? 0,
+                dashboardSummary.latestTrending?.trendingRowsCount ?? 0,
               )}
-              description="가장 최근 정각 트렌딩 결과 수"
+              description="가장 최근 정각 실행 결과 수"
+            />
+            <KpiCard
+              icon={<MinusCircle className="h-5 w-5" />}
+              title="불일치 정각"
+              value={String(dashboardSummary.mismatchHours)}
+              description="snapshot 합계와 차이가 있는 정각 수"
             />
           </section>
 
-          <SectionCard>
-            <div className="mb-5">
-              <h3 className="text-lg font-semibold">정각 트렌딩 실행 요약</h3>
-              <p className="text-sm text-gray-400">
-                최근 정각 기준 트렌딩 실행 상태와 결과 건수를 확인합니다.
+          <section
+  className="grid grid-cols-1 gap-6 xl:grid-cols-[auto_minmax(0,1fr)]"
+>
+  <SectionCard
+      className={`overflow-hidden transition-all duration-300 ${
+        hoursPanelCollapsed ? "xl:w-[72px]" : "xl:w-[340px]"
+      }`}
+    >
+      <div
+        className={`mb-4 flex ${
+          hoursPanelCollapsed
+            ? "flex-col items-center gap-3"
+            : "items-start justify-between gap-3"
+        }`}
+      >
+        {hoursPanelCollapsed ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setHoursPanelCollapsed(false)}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-700 bg-gray-800 text-white transition hover:bg-gray-700"
+              aria-label="정각 실행 목록 펼치기"
+              title="정각 실행 목록 펼치기"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+
+            <div className="writing-mode-vertical text-xs tracking-wide text-gray-400 [writing-mode:vertical-rl]">
+              정각 실행 목록
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <h3 className="text-lg font-semibold text-white">
+                정각 실행 목록
+              </h3>
+              <p className="mt-1 text-sm text-gray-400">
+                시간대를 선택하면 우측에 상세 결과와 검증 정보를 보여줍니다.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              {(dashboard.trendingSummaries ?? []).length === 0 ? (
-                <div className="rounded-xl border border-gray-800 bg-gray-800/40 px-4 py-10 text-center text-sm text-gray-400">
-                  트렌딩 실행 이력이 없습니다.
-                </div>
-              ) : (
-                dashboard.trendingSummaries.map((item) => (
-                  <TrendingRunCard
-                    key={item.calculatedAt}
-                    item={item}
-                    selected={selectedCalculatedAt === item.calculatedAt}
-                    onSelect={() => setSelectedCalculatedAt(item.calculatedAt)}
-                  />
-                ))
-              )}
-            </div>
-          </SectionCard>
+            <button
+              type="button"
+              onClick={() => setHoursPanelCollapsed(true)}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-700 bg-gray-800 text-white transition hover:bg-gray-700"
+              aria-label="정각 실행 목록 접기"
+              title="정각 실행 목록 접기"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          </>
+        )}
+      </div>
 
-          <SectionCard>
-            <div className="mb-5">
-              <h3 className="text-lg font-semibold">10분 버킷 요약</h3>
-              <p className="text-sm text-gray-400">
-                최근 24시간 버킷별 rows 수, delta 합계, 실행 상태를 확인합니다.
-              </p>
-            </div>
+      {!hoursPanelCollapsed && (
+        <div className="space-y-3">
+          {(dashboard.hours ?? []).length === 0 ? (
+            <EmptySection
+              message="트렌딩 실행 이력이 없습니다."
+              compact
+            />
+          ) : (
+            dashboard.hours.map((item) => (
+              <HourListItem
+                key={item.calculatedAt}
+                item={item}
+                selected={selectedCalculatedAt === item.calculatedAt}
+                onSelect={() => setSelectedCalculatedAt(item.calculatedAt)}
+              />
+            ))
+          )}
+        </div>
+      )}
+    </SectionCard>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-800">
-              <table className="w-full min-w-[980px]">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="px-5 py-4 text-left text-sm font-semibold">버킷 시작</th>
-                    <th className="px-5 py-4 text-left text-sm font-semibold">Rows</th>
-                    <th className="px-5 py-4 text-left text-sm font-semibold">조회 delta</th>
-                    <th className="px-5 py-4 text-left text-sm font-semibold">북마크 delta</th>
-                    <th className="px-5 py-4 text-left text-sm font-semibold">완료 delta</th>
-                    <th className="px-5 py-4 text-left text-sm font-semibold">상태</th>
-                    <th className="px-5 py-4 text-left text-sm font-semibold">메시지</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {(dashboard.bucketSummaries ?? []).length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={7}
-                        className="px-5 py-12 text-center text-sm text-gray-400"
-                      >
-                        버킷 요약 데이터가 없습니다.
-                      </td>
-                    </tr>
-                  ) : (
-                    dashboard.bucketSummaries.map((item) => (
-                      <BucketSummaryRow
-                        key={item.bucketStartAt}
-                        item={item}
-                      />
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </SectionCard>
-
-          <SectionCard>
-            <div className="mb-5">
-              <h3 className="text-lg font-semibold">검증 요약</h3>
-              <p className="text-sm text-gray-400">
-                정각별 스냅샷 1시간 합산과 트렌딩 delta 반영 결과를 비교한 요약입니다.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-              {(dashboard.verifySummaries ?? []).length === 0 ? (
-                <div className="rounded-xl border border-gray-800 bg-gray-800/40 px-4 py-10 text-center text-sm text-gray-400 xl:col-span-3">
-                  검증 요약 데이터가 없습니다.
-                </div>
-              ) : (
-                dashboard.verifySummaries.map((item) => (
-                  <VerifySummaryCard
-                    key={item.calculatedAt}
-                    item={item}
-                  />
-                ))
-              )}
-            </div>
-          </SectionCard>
+    <SectionCard className="min-w-0">
+      {!selectedHour ? (
+        <EmptySection
+          message="선택 가능한 정각 데이터가 없습니다."
+          compact
+        />
+      ) : (
+        <SelectedHourSummary item={selectedHour} />
+      )}
+    </SectionCard>
+  </section>
 
           <SectionCard>
             <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <h3 className="text-lg font-semibold">트렌딩 상세</h3>
+                <h3 className="text-lg font-semibold text-white">
+                  트렌딩 상세
+                </h3>
                 <p className="text-sm text-gray-400">
                   선택한 정각 기준 top20 콘텐츠와 점수/증감 지표를 확인합니다.
                 </p>
@@ -270,7 +298,7 @@ const TrendingOperations: React.FC = () => {
                   onChange={(e) => setSelectedCalculatedAt(e.target.value)}
                   className="rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-white"
                 >
-                  {(dashboard.trendingSummaries ?? []).map((item) => (
+                  {(dashboard.hours ?? []).map((item) => (
                     <option key={item.calculatedAt} value={item.calculatedAt}>
                       {formatDateTime(item.calculatedAt)}
                     </option>
@@ -282,20 +310,39 @@ const TrendingOperations: React.FC = () => {
             {detailLoading ? (
               <LoadingSection compact />
             ) : detailItems.length === 0 ? (
-              <EmptySection message="선택한 정각의 트렌딩 상세 데이터가 없습니다." compact />
+              <EmptySection
+                message="선택한 정각의 트렌딩 상세 데이터가 없습니다."
+                compact
+              />
             ) : (
               <div className="overflow-x-auto rounded-xl border border-gray-800">
                 <table className="w-full min-w-[1180px]">
                   <thead className="bg-gray-800">
                     <tr>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">순위</th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">콘텐츠</th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">유형</th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">점수</th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">조회 delta</th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">북마크 delta</th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">완료 delta</th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold">업로더</th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        순위
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        콘텐츠
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        점수
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        조회 delta
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        북마크 delta
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        완료 delta
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        유형
+                      </th>
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                        업로더
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
@@ -314,9 +361,6 @@ const TrendingOperations: React.FC = () => {
                               contentId: {item.contentId}
                             </span>
                           </div>
-                        </td>
-                        <td className="px-5 py-4 text-sm text-gray-300">
-                          {item.type}
                         </td>
                         <td className="px-5 py-4 text-sm text-white">
                           {formatNumber(item.score)}
@@ -340,6 +384,9 @@ const TrendingOperations: React.FC = () => {
                           />
                         </td>
                         <td className="px-5 py-4 text-sm text-gray-300">
+                          {item.type}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-gray-300">
                           {item.uploaderName
                             ? `${item.uploaderName} (#${item.uploaderId ?? "-"})`
                             : "-"}
@@ -351,14 +398,106 @@ const TrendingOperations: React.FC = () => {
               </div>
             )}
           </SectionCard>
+
+          <SectionCard>
+            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  10분 버킷 요약
+                </h3>
+                <p className="text-sm text-gray-400">
+                  최근 24시간 버킷별 rows 수, delta 합계, 실행 상태를 확인합니다.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAllBuckets((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-700"
+              >
+                {showAllBuckets ? (
+                  <>
+                    <ChevronUp className="h-4 w-4" />
+                    최근 5건만 보기
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4" />
+                    전체 보기
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-gray-800">
+              <table className="w-full min-w-[980px]">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                      버킷 시작
+                    </th>
+                    <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                      Rows
+                    </th>
+                    <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                      조회 delta
+                    </th>
+                    <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                      북마크 delta
+                    </th>
+                    <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                      완료 delta
+                    </th>
+                    <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                      상태
+                    </th>
+                    <th className="px-5 py-4 text-left text-sm font-semibold text-white">
+                      메시지
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {visibleBuckets.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-5 py-12 text-center text-sm text-gray-400"
+                      >
+                        버킷 요약 데이터가 없습니다.
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleBuckets.map((item) => (
+                      <BucketSummaryRow
+                        key={item.bucketStartAt}
+                        item={item}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
         </>
       )}
     </div>
   );
 };
 
-const SectionCard = ({ children }: { children: React.ReactNode }) => {
-  return <section className="rounded-2xl bg-gray-900 p-6">{children}</section>;
+const SectionCard = ({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => {
+  return (
+    <section
+      className={`rounded-2xl border border-gray-800 bg-gray-900 p-6 shadow-sm ${className}`}
+    >
+      {children}
+    </section>
+  );
 };
 
 const KpiCard = ({
@@ -373,7 +512,7 @@ const KpiCard = ({
   description: string;
 }) => {
   return (
-    <div className="rounded-2xl bg-gray-900 p-5">
+    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
       <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-gray-800 text-primary">
         {icon}
       </div>
@@ -384,12 +523,12 @@ const KpiCard = ({
   );
 };
 
-const TrendingRunCard = ({
+const HourListItem = ({
   item,
   selected,
   onSelect,
 }: {
-  item: AdminMetricsDashboardTrendingSummary;
+  item: AdminMetricsDashboardHourItem;
   selected: boolean;
   onSelect: () => void;
 }) => {
@@ -399,38 +538,175 @@ const TrendingRunCard = ({
     <button
       type="button"
       onClick={onSelect}
-      className={`rounded-2xl border p-5 text-left transition ${
+      className={`w-full rounded-xl border px-4 py-3 text-left transition ${
         selected
           ? "border-primary bg-primary/10"
-          : "border-gray-800 bg-gray-800/50 hover:bg-gray-800"
+          : "border-gray-800 bg-gray-800/40 hover:bg-gray-800"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-gray-300">
-          <Clock3 className="h-4 w-4" />
-          {formatDateTime(item.calculatedAt)}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-medium text-white">
+            <Clock3 className="h-4 w-4 text-gray-400" />
+            <span className="truncate">{formatDateTime(item.calculatedAt)}</span>
+          </div>
+          <p className="mt-2 text-xs text-gray-400">
+            결과 건수 {formatNumber(item.trendingRowsCount)}
+          </p>
         </div>
-        <span
-          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badge.color}`}
-        >
-          {badge.label}
-        </span>
-      </div>
 
-      <div className="text-sm text-gray-300">
-        <p>결과 건수: {formatNumber(item.trendingHistoryCount)}</p>
-        <p className="mt-1 truncate text-gray-400">
-          메시지: {item.message || "-"}
-        </p>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${badge.color}`}
+          >
+            {badge.label}
+          </span>
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              item.mismatch
+                ? "bg-red-500/20 text-red-400"
+                : "bg-green-500/20 text-green-400"
+            }`}
+          >
+            {item.mismatch ? "불일치" : "일치"}
+          </span>
+        </div>
       </div>
     </button>
+  );
+};
+
+const SelectedHourSummary = ({
+  item,
+}: {
+  item: AdminMetricsDashboardHourItem;
+}) => {
+  const badge = ADMIN_JOB_STATUS_MAP[item.jobStatus];
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-sm text-gray-400">선택한 정각</p>
+          <h3 className="mt-1 text-xl font-bold text-white">
+            {formatDateTime(item.calculatedAt)}
+          </h3>
+          <p className="mt-2 text-sm text-gray-400">
+            {item.jobMessage || "-"}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${badge.color}`}
+          >
+            {badge.label}
+          </span>
+          <span
+            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+              item.mismatch
+                ? "bg-red-500/20 text-red-400"
+                : "bg-green-500/20 text-green-400"
+            }`}
+          >
+            {item.mismatch ? "불일치" : "일치"}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <MiniStat label="트렌딩 건수" value={item.trendingRowsCount} />
+        <MiniStat label="트렌딩 조회" value={item.trendingSumDeltaView} />
+        <MiniStat
+          label="트렌딩 북마크"
+          value={item.trendingSumDeltaBookmark}
+        />
+        <MiniStat
+          label="트렌딩 완료"
+          value={item.trendingSumDeltaCompleted}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <CompareBlock
+          title="조회수 비교"
+          leftLabel="Trending"
+          leftValue={item.trendingSumDeltaView}
+          rightLabel="Snapshot"
+          rightValue={item.snapshotSumDeltaView}
+        />
+        <CompareBlock
+          title="북마크 비교"
+          leftLabel="Trending"
+          leftValue={item.trendingSumDeltaBookmark}
+          rightLabel="Snapshot"
+          rightValue={item.snapshotSumDeltaBookmark}
+        />
+        <CompareBlock
+          title="완료수 비교"
+          leftLabel="Trending"
+          leftValue={item.trendingSumDeltaCompleted}
+          rightLabel="Snapshot"
+          rightValue={item.snapshotSumDeltaCompleted}
+        />
+      </div>
+    </div>
+  );
+};
+
+const MiniStat = ({
+  label,
+  value,
+}: {
+  label: string;
+  value?: number | null;
+}) => {
+  return (
+    <div className="rounded-xl bg-gray-800/60 px-4 py-4">
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-white">{formatNumber(value)}</p>
+    </div>
+  );
+};
+
+const CompareBlock = ({
+  title,
+  leftLabel,
+  leftValue,
+  rightLabel,
+  rightValue,
+}: {
+  title: string;
+  leftLabel: string;
+  leftValue?: number | null;
+  rightLabel: string;
+  rightValue?: number | null;
+}) => {
+  return (
+    <div className="rounded-2xl border border-gray-800 bg-gray-800/40 p-4">
+      <p className="text-sm font-semibold text-white">{title}</p>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-gray-900 px-4 py-3">
+          <p className="text-xs text-gray-400">{leftLabel}</p>
+          <p className="mt-1 text-lg font-bold text-white">
+            {formatNumber(leftValue)}
+          </p>
+        </div>
+        <div className="rounded-xl bg-gray-900 px-4 py-3">
+          <p className="text-xs text-gray-400">{rightLabel}</p>
+          <p className="mt-1 text-lg font-bold text-white">
+            {formatNumber(rightValue)}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 };
 
 const BucketSummaryRow = ({
   item,
 }: {
-  item: AdminMetricsDashboardBucketSummary;
+  item: AdminMetricsDashboardBucketItem;
 }) => {
   const badge = ADMIN_JOB_STATUS_MAP[item.jobStatus];
 
@@ -443,13 +719,13 @@ const BucketSummaryRow = ({
         {formatNumber(item.rowsCount)}
       </td>
       <td className="px-5 py-4 text-sm text-gray-300">
-        {formatNumber(item.viewDeltaSum)}
+        {formatNumber(item.sumDeltaView)}
       </td>
       <td className="px-5 py-4 text-sm text-gray-300">
-        {formatNumber(item.bookmarkDeltaSum)}
+        {formatNumber(item.sumDeltaBookmark)}
       </td>
       <td className="px-5 py-4 text-sm text-gray-300">
-        {formatNumber(item.completedDeltaSum)}
+        {formatNumber(item.sumDeltaCompleted)}
       </td>
       <td className="px-5 py-4 text-sm">
         <span
@@ -459,40 +735,9 @@ const BucketSummaryRow = ({
         </span>
       </td>
       <td className="px-5 py-4 text-sm text-gray-400">
-        {item.message || "-"}
+        {item.jobMessage || "-"}
       </td>
     </tr>
-  );
-};
-
-const VerifySummaryCard = ({
-  item,
-}: {
-  item: AdminMetricsDashboardVerifySummary;
-}) => {
-  return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-800/50 p-5">
-      <p className="text-xs uppercase tracking-wide text-gray-400">
-        Calculated At
-      </p>
-      <p className="mt-2 text-base font-semibold text-white">
-        {formatDateTime(item.calculatedAt)}
-      </p>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-gray-900 px-4 py-3">
-          <p className="text-xs text-gray-400">Matched</p>
-          <p className="mt-1 text-lg font-bold text-white">
-            {formatNumber(item.matchedCount)}
-          </p>
-        </div>
-        <div className="rounded-xl bg-gray-900 px-4 py-3">
-          <p className="text-xs text-gray-400">Mismatched</p>
-          <p className="mt-1 text-lg font-bold text-white">
-            {formatNumber(item.mismatchedCount)}
-          </p>
-        </div>
-      </div>
-    </div>
   );
 };
 
@@ -501,7 +746,7 @@ const MetricDelta = ({
   value,
 }: {
   icon: React.ReactNode;
-  value: number;
+  value?: number | null;
 }) => {
   return (
     <div className="inline-flex items-center gap-2">
@@ -537,7 +782,7 @@ const EmptySection = ({
   );
 };
 
-const formatNumber = (value: number) => value.toLocaleString();
+const formatNumber = (value?: number | null) => (value ?? 0).toLocaleString();
 
 const formatDateTime = (value: string) => {
   const date = new Date(value);

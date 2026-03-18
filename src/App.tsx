@@ -33,6 +33,7 @@ const App: React.FC = () => {
         <Route path="/movie" element={<MoviePage />} />
         <Route path="/series" element={<SeriesPage />} />
         <Route path="/creator" element={<CreatorPage />} />
+        <Route path="/creator/:videoId" element={<CreatorPage />} />
         <Route path="/studio" element={<StudioPage />} />
         <Route path="/admin" element={<AdminPage />} />
         {/* OAuth 콜백 라우트 */}

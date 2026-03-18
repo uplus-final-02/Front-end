@@ -197,10 +197,7 @@ const HomePage: React.FC = () => {
       // 이어보기 (시청 이력 API로 진행률 포함)
       if (user) {
         try {
-          const historyData = await historyService.getWatchHistory(
-            undefined,
-            5,
-          );
+          const historyData = await historyService.getHomeWatchHistory();
           setContinueWatching(
             historyData.watchHistory.filter((h) => h.status !== "COMPLETED"),
           );

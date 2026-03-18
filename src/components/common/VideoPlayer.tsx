@@ -69,6 +69,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // 구독 여부에 따른 제한
   const canUseSpeedControl = user?.subscriptionType !== "none";
+  const isFreeUser = user?.subscriptionType === "none";
+  const MAX_FREE_HEIGHT = 720;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -96,6 +98,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }));
         setQualityLevels(levels);
         setCurrentQuality(-1); // 자동
+
+        // free 유저는 720p 이하로 자동 화질 제한
+        if (user?.subscriptionType === "none") {
+          const maxIndex = levels
+            .filter((l) => l.height <= 720)
+            .sort((a, b) => b.height - a.height)[0]?.index;
+          if (maxIndex !== undefined) {
+            hls.currentLevel = maxIndex;
+            setCurrentQuality(maxIndex);
+          }
+        }
 
         if (startTime > 0) {
           video.currentTime = startTime;
@@ -210,8 +223,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const changeQuality = (levelIndex: number) => {
+    if (levelIndex === currentQuality) return;
     const hls = hlsRef.current;
     if (!hls) return;
+    // free 유저는 720p 초과 선택 불가
+    if (isFreeUser && levelIndex !== -1) {
+      const level = qualityLevels.find((l) => l.index === levelIndex);
+      if (level && level.height > MAX_FREE_HEIGHT) return;
+    }
+    // free 유저가 자동 선택 시 720p 이하 최대값으로 고정
+    if (isFreeUser && levelIndex === -1) {
+      const maxIndex = qualityLevels
+        .filter((l) => l.height <= MAX_FREE_HEIGHT)
+        .sort((a, b) => b.height - a.height)[0]?.index;
+      if (maxIndex !== undefined) {
+        hls.currentLevel = maxIndex;
+        setCurrentQuality(maxIndex);
+        setShowSettings(false);
+        return;
+      }
+    }
     hls.currentLevel = levelIndex; // -1 = 자동
     setCurrentQuality(levelIndex);
     setShowSettings(false);
@@ -394,24 +425,38 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
                       {settingsTab === "quality" && (
                         <>
-                          <button
-                            onClick={() => changeQuality(-1)}
-                            className={`block w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors ${currentQuality === -1 ? "text-primary" : ""}`}
-                          >
-                            자동
-                          </button>
+                          {!isFreeUser && (
+                            <button
+                              onClick={() => changeQuality(-1)}
+                              className={`block w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors ${currentQuality === -1 ? "text-primary" : ""}`}
+                            >
+                              자동
+                            </button>
+                          )}
                           {qualityLevels
                             .slice()
                             .sort((a, b) => b.height - a.height)
-                            .map((level) => (
-                              <button
-                                key={level.index}
-                                onClick={() => changeQuality(level.index)}
-                                className={`block w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors ${currentQuality === level.index ? "text-primary" : ""}`}
-                              >
-                                {level.height}p
-                              </button>
-                            ))}
+                            .map((level) => {
+                              const locked =
+                                isFreeUser && level.height > MAX_FREE_HEIGHT;
+                              return (
+                                <button
+                                  key={level.index}
+                                  onClick={() =>
+                                    !locked && changeQuality(level.index)
+                                  }
+                                  disabled={locked}
+                                  className={`block w-full text-left px-3 py-2 rounded text-sm transition-colors ${locked ? "opacity-40 cursor-not-allowed" : "hover:bg-gray-800"} ${currentQuality === level.index ? "text-primary" : ""}`}
+                                >
+                                  {level.height}p{locked ? " 🔒" : ""}
+                                </button>
+                              );
+                            })}
+                          {isFreeUser && (
+                            <div className="text-[10px] text-gray-200 px-3 pt-2 border-t border-gray-700 mt-1 whitespace-nowrap">
+                              구독 시 최고화질 이용 가능
+                            </div>
+                          )}
                         </>
                       )}
 

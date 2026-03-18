@@ -6,7 +6,7 @@ const TOKEN_KEY = "accessToken";
 const REFRESH_TOKEN_KEY = "refreshToken";
 
 export type WithdrawalReason = "PRICE" | "CONTENT" | "UX" | "OTHER";
-  
+
 export const authService = {
   // ══════════════════════════════════════════════════════════════
   //  회원가입 4단계
@@ -155,7 +155,7 @@ export const authService = {
           email,
           nickname: email.split("@")[0],
           preferredTags: [],
-          subscriptionType: "basic",
+          subscriptionType: "none",
           isLGUPlus: false,
           paid: false,
           joinDate: new Date().toISOString(),
@@ -213,7 +213,7 @@ export const authService = {
       email,
       nickname,
       preferredTags: tagIds.map((id) => id.toString()), // tagIds를 문자열 배열로 변환
-      subscriptionType: "basic",
+      subscriptionType: "none",
       isLGUPlus: false,
       paid: false,
       joinDate: new Date().toISOString(),
@@ -274,14 +274,11 @@ export const authService = {
   },
 
   // 회원 탈퇴
-  withdraw: async (data: {
-    reason: WithdrawalReason;
-  }): Promise<void> => {
+  withdraw: async (data: { reason: WithdrawalReason }): Promise<void> => {
     await apiClient.delete("/api/users/me", {
       data,
     });
   },
-
 
   // ══════════════════════════════════════════════════════════════
   //  소셜 로그인
@@ -339,7 +336,7 @@ export const authService = {
             email: payload.email || "",
             nickname: payload.nickname || "사용자",
             preferredTags: [],
-            subscriptionType: "basic",
+            subscriptionType: "none",
             isLGUPlus: false,
             paid: false,
             joinDate: new Date().toISOString(),
@@ -359,7 +356,7 @@ export const authService = {
             email: "",
             nickname: "사용자",
             preferredTags: [],
-            subscriptionType: "basic",
+            subscriptionType: "none",
             isLGUPlus: false,
             paid: false,
             joinDate: new Date().toISOString(),

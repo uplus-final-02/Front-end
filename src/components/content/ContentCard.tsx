@@ -19,7 +19,7 @@ const ContentCard: React.FC<ContentCardProps> = ({
   disableHover = false,
   simpleHover = false,
   noScale = false,
-  onBookmarkToggle,
+  onBookmarkToggle: _onBookmarkToggle,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
@@ -37,7 +37,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
   const description = content.description || "";
   const viewCount = content.viewCount || 0;
   const bookmarkCount = content.bookmarkCount || 0;
-  const uploaderName = content.uploaderName || "알 수 없음";
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -47,13 +46,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
       onCardClick(content);
     }
     setTimeout(() => setIsClicked(false), 100);
-  };
-
-  const handleBookmarkClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onBookmarkToggle) {
-      onBookmarkToggle(content.id);
-    }
   };
 
   // 호버 비활성화 모드 (인기차트용)

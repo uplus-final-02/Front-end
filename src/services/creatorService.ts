@@ -288,20 +288,25 @@ export const creatorService = {
   },
 
   /**
-   * 메타데이터 수정 (제목, 설명)
+   * 메타데이터 수정 (제목, 설명, 썸네일URL, 상태)
    * PUT /api/user/contents/{id}/metadata
    */
   updateMetadata: async (
     userContentId: number,
     title: string,
     description: string | null,
+    thumbnailUrl: string,
+    contentStatus: "HIDDEN" | "ACTIVE",
     videoStatus?: "PUBLIC" | "PRIVATE",
   ): Promise<void> => {
-    const body: Record<string, unknown> = { title };
-    if (description) {
-      // description 컬럼이 json 타입이므로 JSON 문자열로 감싸서 전송
-      body.description = JSON.stringify(description);
-    }
+    const body: Record<string, unknown> = {
+      title,
+      description: description
+        ? JSON.stringify(description)
+        : JSON.stringify(""),
+      thumbnailUrl,
+      contentStatus,
+    };
     if (videoStatus) {
       body.videoStatus = videoStatus;
     }
@@ -343,5 +348,13 @@ export const creatorService = {
     } catch {
       return [];
     }
+  },
+
+  /**
+   * 유저 콘텐츠 삭제
+   * DELETE /api/user/contents/{userContentId}
+   */
+  deleteContent: async (userContentId: number): Promise<void> => {
+    await apiClient.delete(`/api/user/contents/${userContentId}`);
   },
 };

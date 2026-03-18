@@ -11,10 +11,18 @@ import {
   ArrowLeft,
   Plus,
   Play,
+  Edit,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { creatorService, FeedItem } from "@/services/creatorService";
 import { searchService } from "@/services/searchService";
+import {
+  subscribeUserTranscode,
+  type SSESubscription,
+  type TranscodeResultEvent,
+} from "@/services/sseService";
 import type { Content } from "@/types";
 
 type PageStep =
@@ -54,6 +62,15 @@ const StudioPage: React.FC = () => {
   const [myUploadsLoading, setMyUploadsLoading] = useState(false);
   const [myUploadsError, setMyUploadsError] = useState(false);
 
+  // ── 수정/삭제 상태 ──
+  const [editTarget, setEditTarget] = useState<FeedItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editThumbnailFile, setEditThumbnailFile] = useState<File | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FeedItem | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   // ── 업로드 폼 상태 ──
   const [formData, setFormData] = useState({
     title: "",
@@ -68,6 +85,14 @@ const StudioPage: React.FC = () => {
   });
   const [errorMsg, setErrorMsg] = useState("");
   const [autoPublished, setAutoPublished] = useState(false);
+  const sseRef = useRef<SSESubscription | null>(null);
+
+  // SSE 정리
+  useEffect(() => {
+    return () => {
+      sseRef.current?.close();
+    };
+  }, []);
 
   // ── 내 콘텐츠 로드 ──
   const loadMyUploads = async () => {
@@ -87,10 +112,12 @@ const StudioPage: React.FC = () => {
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    loadMyUploads();
-  }, []);
+    if (!loading && user) {
+      loadMyUploads();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user]);
 
   // 외부 클릭 시 자동완성 닫기
   useEffect(() => {
@@ -222,53 +249,70 @@ const StudioPage: React.FC = () => {
         presign.objectKey,
       );
 
-      setProgress({ step: "메타데이터 저장 중...", percent: 85 });
+      let thumbnailUrl = "";
+      if (formData.thumbnailFile) {
+        setProgress({ step: "썸네일 업로드 중...", percent: 83 });
+        const thumbResult = await creatorService.uploadThumbnail(
+          draft.userContentId,
+          formData.thumbnailFile,
+        );
+        thumbnailUrl = thumbResult.thumbnailUrl || "";
+      }
+
+      setProgress({ step: "메타데이터 저장 중...", percent: 88 });
       await creatorService.updateMetadata(
         draft.userContentId,
         formData.title.trim(),
         formData.description.trim() || null,
+        thumbnailUrl,
+        "HIDDEN",
       );
 
-      if (formData.thumbnailFile) {
-        setProgress({ step: "썸네일 업로드 중...", percent: 90 });
-        await creatorService.uploadThumbnail(
-          draft.userContentId,
-          formData.thumbnailFile,
-        );
-      }
+      // SSE로 트랜스코딩 결과 대기
+      setProgress({ step: "트랜스코딩 처리 중...", percent: 92 });
 
-      // 트랜스코딩 완료 대기 후 자동 공개
-      setProgress({ step: "트랜스코딩 대기 중...", percent: 92 });
-      const maxAttempts = 120;
-      let published = false;
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise((r) => setTimeout(r, 5000));
-        try {
-          await creatorService.updateMetadata(
-            draft.userContentId,
-            formData.title.trim(),
-            formData.description.trim() || null,
-            "PUBLIC",
-          );
-          published = true;
-          break;
-        } catch {
-          const pct = Math.min(92 + Math.floor((i / maxAttempts) * 7), 99);
+      sseRef.current?.close();
+      sseRef.current = subscribeUserTranscode(
+        draft.userContentId,
+        async (event: TranscodeResultEvent) => {
+          sseRef.current?.close();
+          if (event.transcodeStatus === "DONE") {
+            // 트랜스코딩 완료 → 공개 요청
+            try {
+              await creatorService.updateMetadata(
+                draft.userContentId,
+                formData.title.trim(),
+                formData.description.trim() || null,
+                thumbnailUrl,
+                "ACTIVE",
+                "PUBLIC",
+              );
+              setProgress({ step: "완료!", percent: 100 });
+              setAutoPublished(true);
+            } catch {
+              setProgress({
+                step: "업로드 완료 (공개 전환 실패)",
+                percent: 100,
+              });
+              setAutoPublished(false);
+            }
+            setPageStep("done");
+          } else {
+            // FAILED
+            setErrorMsg(event.reason || "트랜스코딩에 실패했습니다.");
+            setPageStep("error");
+          }
+        },
+        () => {
+          // SSE 연결 실패 시 폴백: 수동 확인 안내
           setProgress({
-            step: `트랜스코딩 처리 중... (${i + 1}회 확인)`,
-            percent: pct,
+            step: "업로드 완료 (트랜스코딩 진행 중)",
+            percent: 100,
           });
-        }
-      }
-
-      if (published) {
-        setProgress({ step: "완료!", percent: 100 });
-        setAutoPublished(true);
-      } else {
-        setProgress({ step: "업로드 완료 (트랜스코딩 진행 중)", percent: 100 });
-        setAutoPublished(false);
-      }
-      setPageStep("done");
+          setAutoPublished(false);
+          setPageStep("done");
+        },
+      );
     } catch (err: any) {
       console.error("업로드 실패:", err);
       setErrorMsg(
@@ -295,14 +339,82 @@ const StudioPage: React.FC = () => {
     setProgress({ step: "", percent: 0 });
     setErrorMsg("");
     setAutoPublished(false);
+    loadMyUploads();
+  };
+
+  // ── 수정 ──
+  const handleOpenEdit = (item: FeedItem) => {
+    setEditTarget(item);
+    setEditTitle(item.title);
+    setEditDescription("");
+    setEditThumbnailFile(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editTarget || !editTitle.trim()) return;
+    setEditSaving(true);
+    try {
+      let thumbnailUrl = editTarget.thumbnailUrl || "";
+      if (editThumbnailFile) {
+        const thumbResult = await creatorService.uploadThumbnail(
+          editTarget.userContentId,
+          editThumbnailFile,
+        );
+        thumbnailUrl = thumbResult.thumbnailUrl || thumbnailUrl;
+      }
+      await creatorService.updateMetadata(
+        editTarget.userContentId,
+        editTitle.trim(),
+        editDescription.trim() || null,
+        thumbnailUrl,
+        "ACTIVE",
+      );
+      // UI에서 즉시 반영
+      setMyUploads((prev) =>
+        prev.map((item) =>
+          item.userContentId === editTarget.userContentId
+            ? {
+                ...item,
+                title: editTitle.trim(),
+                thumbnailUrl: thumbnailUrl || item.thumbnailUrl,
+              }
+            : item,
+        ),
+      );
+      setEditTarget(null);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "수정에 실패했습니다.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── 삭제 ──
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      await creatorService.deleteContent(deleteTarget.userContentId);
+      // UI에서 즉시 제거 (ES 인덱스 반영 지연 대비)
+      setMyUploads((prev) =>
+        prev.filter(
+          (item) => item.userContentId !== deleteTarget.userContentId,
+        ),
+      );
+      setDeleteTarget(null);
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "삭제에 실패했습니다.");
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   // ── 업로드 진행 화면 ──
   if (pageStep === "uploading") {
     return (
-      <div className="min-h-screen bg-dark">
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-3xl mx-auto bg-gray-900 rounded-lg p-12 text-center">
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="max-w-3xl w-full mx-auto px-4">
+          <div className="bg-gray-900 rounded-lg p-12 text-center">
             <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-6" />
             <h2 className="text-xl font-bold mb-4">업로드 중...</h2>
             <p className="text-gray-400 mb-6">{progress.step}</p>
@@ -322,8 +434,8 @@ const StudioPage: React.FC = () => {
   // ── 완료 화면 ──
   if (pageStep === "done") {
     return (
-      <div className="min-h-screen bg-dark">
-        <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto bg-gray-900 rounded-lg p-12 text-center">
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
             <h2 className="text-xl font-bold mb-2">업로드 완료</h2>
@@ -411,12 +523,11 @@ const StudioPage: React.FC = () => {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
                 {myUploads.map((item) => (
-                  <div
-                    key={item.userContentId}
-                    className="cursor-pointer group"
-                    onClick={() => navigate(`/creator/${item.userContentId}`)}
-                  >
-                    <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800 mb-2 transition-all duration-300 group-hover:ring-2 ring-primary">
+                  <div key={item.userContentId} className="group">
+                    <div
+                      className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800 mb-2 transition-all duration-300 group-hover:ring-2 ring-primary cursor-pointer"
+                      onClick={() => navigate(`/creator/${item.userContentId}`)}
+                    >
                       {item.thumbnailUrl ? (
                         <img
                           src={item.thumbnailUrl}
@@ -438,11 +549,145 @@ const StudioPage: React.FC = () => {
                     <p className="text-xs text-gray-400">
                       조회수 {(item.totalViewCount ?? 0).toLocaleString()}회
                     </p>
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEdit(item);
+                        }}
+                        className="text-xs text-gray-400 hover:text-yellow-400 flex items-center gap-1 transition-colors"
+                      >
+                        <Edit className="w-3 h-3" /> 수정
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(item);
+                        }}
+                        className="text-xs text-gray-400 hover:text-red-400 flex items-center gap-1 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" /> 삭제
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* 수정 모달 */}
+          {editTarget && (
+            <div
+              className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+              onClick={() => setEditTarget(null)}
+            >
+              <div
+                className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">콘텐츠 수정</h3>
+                  <button
+                    onClick={() => setEditTarget(null)}
+                    className="p-1 hover:text-gray-400"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">
+                      제목
+                    </label>
+                    <input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">
+                      설명
+                    </label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      rows={3}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">
+                      썸네일 변경 (선택)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setEditThumbnailFile(e.target.files?.[0] || null)
+                      }
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm file:mr-3 file:py-1 file:px-2 file:rounded file:border-0 file:bg-primary file:text-white file:text-xs"
+                    />
+                  </div>
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button
+                      onClick={() => setEditTarget(null)}
+                      className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={handleEditSave}
+                      disabled={editSaving || !editTitle.trim()}
+                      className="px-4 py-2 bg-primary rounded hover:bg-primary/80 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {editSaving && (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      )}
+                      저장
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 삭제 확인 모달 */}
+          {deleteTarget && (
+            <div
+              className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+              onClick={() => setDeleteTarget(null)}
+            >
+              <div
+                className="bg-gray-900 rounded-lg p-6 max-w-sm w-full mx-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold mb-4">콘텐츠 삭제</h3>
+                <p className="text-gray-400 mb-2">"{deleteTarget.title}"</p>
+                <p className="text-gray-400 mb-6 text-sm">
+                  정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setDeleteTarget(null)}
+                    className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleteLoading}
+                    className="px-4 py-2 bg-red-600 rounded hover:bg-red-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {deleteLoading && (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    )}
+                    삭제
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );

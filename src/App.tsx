@@ -9,6 +9,7 @@ import MyPage from "./pages/user/MyPage";
 import SearchPage from "./pages/content/SearchPage";
 import SubscribePage from "./pages/user/SubscribePage";
 import OriginalPage from "./pages/content/OriginalPage";
+import AllContentsPage from "./pages/content/AllContentsPage";
 import MoviePage from "./pages/content/MoviePage";
 import SeriesPage from "./pages/content/SeriesPage";
 import CreatorPage from "./pages/creator/CreatorPage";
@@ -30,6 +31,7 @@ const App: React.FC = () => {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/subscribe" element={<SubscribePage />} />
         <Route path="/original" element={<OriginalPage />} />
+        <Route path="/all" element={<AllContentsPage />} />
         <Route path="/movie" element={<MoviePage />} />
         <Route path="/series" element={<SeriesPage />} />
         <Route path="/creator" element={<CreatorPage />} />

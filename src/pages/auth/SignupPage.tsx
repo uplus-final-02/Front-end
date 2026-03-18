@@ -66,7 +66,9 @@ const SignupPage: React.FC = () => {
     }
   };
 
-  // STEP 1-B: 인증코드 확인 → 프로필 단계로
+  // STEP 1-B: 인증코드 확인 → 성공 모달 후 프로필 단계로
+  const [emailVerified, setEmailVerified] = useState(false);
+
   const handleVerifyCode = async () => {
     if (!verificationCode) {
       setError("인증코드를 입력해주세요.");
@@ -76,8 +78,11 @@ const SignupPage: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      // 인증코드만 확인하고 프로필 단계로 이동 (verify-code API는 비밀번호도 필요하므로 프로필 단계에서 호출)
-      setStep("profile");
+      setEmailVerified(true);
+      setAlertModal({
+        message: "이메일 인증이 완료되었습니다.",
+        type: "success",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "인증 실패");
     } finally {
@@ -101,6 +106,10 @@ const SignupPage: React.FC = () => {
     }
     if (!nickname) {
       setError("닉네임을 입력해주세요.");
+      return;
+    }
+    if (/\s/.test(nickname)) {
+      setError("닉네임에 공백을 포함할 수 없습니다.");
       return;
     }
 
@@ -499,7 +508,13 @@ const SignupPage: React.FC = () => {
         <AlertModal
           message={alertModal.message}
           type={alertModal.type}
-          onClose={() => setAlertModal(null)}
+          onClose={() => {
+            setAlertModal(null);
+            if (emailVerified && step === "email") {
+              setEmailVerified(false);
+              setStep("profile");
+            }
+          }}
         />
       )}
     </div>

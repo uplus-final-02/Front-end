@@ -217,7 +217,6 @@ const ContentCard: React.FC<ContentCardProps> = ({
                     <span>{bookmarkCount.toLocaleString()}</span>
                   </span>
                 </div>
-                <span className="text-gray-600">{uploaderName}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {content.tags.map((tag, index) => (

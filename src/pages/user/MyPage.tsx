@@ -28,6 +28,8 @@ import {
   type UserContentWatchHistoryGroup,
 } from "@/services/historyService";
 import { statsService, type WatchStatistics } from "@/services/historyService";
+import { videoService } from "@/services/videoService";
+import { contentService } from "@/services/contentService";
 import {
   subscriptionService,
   type SubscriptionInfo,
@@ -90,6 +92,23 @@ const MyPage: React.FC = () => {
   const [playlistIndex, setPlaylistIndex] = useState(0);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [playlistLoading, setPlaylistLoading] = useState(false);
+
+  // 플레이리스트 현재 영상의 서명된 URL
+  const [playlistVideoUrl, setPlaylistVideoUrl] = useState<string>("");
+  const [playlistVideoLoading, setPlaylistVideoLoading] = useState(false);
+  const playlistModalRef = useRef<HTMLDivElement>(null);
+  const [playlistFullscreen, setPlaylistFullscreen] = useState(false);
+
+  // ESC 등으로 전체화면 해제 시 상태 동기화
+  useEffect(() => {
+    const handler = () => {
+      if (!document.fullscreenElement) {
+        setPlaylistFullscreen(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
 
   // 북마크 선택 모드 (연속 재생용) - 배열로 선택 순서 유지
   const [selectMode, setSelectMode] = useState(false);
@@ -307,6 +326,45 @@ const MyPage: React.FC = () => {
   };
 
   const currentPlaylistItem = playlist[playlistIndex] || null;
+
+  // 플레이리스트 인덱스 변경 시 서명된 URL 가져오기
+  useEffect(() => {
+    if (!showPlaylist || !currentPlaylistItem) return;
+
+    const fetchPlayUrl = async () => {
+      setPlaylistVideoLoading(true);
+      setPlaylistVideoUrl("");
+      try {
+        let videoId: number | string | null = currentPlaylistItem.episodeId;
+
+        // 단건 콘텐츠: episodeId가 null이면 contentId로 상세 조회해서 videoId 추출
+        if (!videoId) {
+          const detail = await contentService.getContentById(
+            String(currentPlaylistItem.contentId),
+          );
+          videoId =
+            detail.episodes && detail.episodes.length > 0
+              ? detail.episodes[0].id
+              : null;
+        }
+
+        if (!videoId) {
+          setPlaylistVideoUrl(currentPlaylistItem.videoUrl || "");
+          return;
+        }
+
+        const info = await videoService.getPlayInfo(videoId);
+        setPlaylistVideoUrl(info.url || "");
+      } catch (err) {
+        console.error("플레이리스트 재생 정보 조회 실패:", err);
+        setPlaylistVideoUrl(currentPlaylistItem.videoUrl || "");
+      } finally {
+        setPlaylistVideoLoading(false);
+      }
+    };
+
+    fetchPlayUrl();
+  }, [showPlaylist, playlistIndex]);
 
   const loadWatchHistory = async (cursor?: number) => {
     setHistoryLoading(true);
@@ -1742,89 +1800,120 @@ const MyPage: React.FC = () => {
 
       {/* 플레이리스트 연속 재생 모달 */}
       {showPlaylist && currentPlaylistItem && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
+        <div
+          ref={playlistModalRef}
+          className={`fixed inset-0 z-50 flex flex-col ${playlistFullscreen ? "bg-black" : "bg-black/95"}`}
+        >
           {/* 상단 바 */}
-          <div className="flex items-center justify-between px-6 py-3 bg-gray-900/80">
-            <div className="flex items-center gap-3 min-w-0">
-              <Play className="w-5 h-5 text-primary flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">
-                  {currentPlaylistItem.title}
-                  {currentPlaylistItem.episodeTitle && (
-                    <span className="text-gray-400 font-normal">
-                      {" "}
-                      · {currentPlaylistItem.episodeTitle}
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {playlistIndex + 1} / {playlist.length}
-                </p>
+          {!playlistFullscreen && (
+            <div className="flex items-center justify-between px-6 py-3 bg-gray-900/80">
+              <div className="flex items-center gap-3 min-w-0">
+                <Play className="w-5 h-5 text-primary flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">
+                    {currentPlaylistItem.title}
+                    {currentPlaylistItem.episodeTitle && (
+                      <span className="text-gray-400 font-normal">
+                        {" "}
+                        · {currentPlaylistItem.episodeTitle}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {playlistIndex + 1} / {playlist.length}
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => setShowPlaylist(false)}
+                className="text-gray-400 hover:text-white transition-colors text-sm px-3 py-1"
+              >
+                닫기
+              </button>
             </div>
-            <button
-              onClick={() => setShowPlaylist(false)}
-              className="text-gray-400 hover:text-white transition-colors text-sm px-3 py-1"
-            >
-              닫기
-            </button>
-          </div>
+          )}
 
           {/* 비디오 플레이어 */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-full max-w-5xl">
-              <VideoPlayer
-                videoUrl={currentPlaylistItem.videoUrl || ""}
-                startTime={currentPlaylistItem.lastPosition}
-                autoPlay={true}
-                onEnded={handlePlaylistNext}
-              />
+          <div
+            className={`flex-1 flex items-center justify-center ${playlistFullscreen ? "h-full" : ""}`}
+          >
+            <div
+              className={`w-full ${playlistFullscreen ? "h-full" : "max-w-5xl"}`}
+            >
+              {playlistVideoLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <VideoPlayer
+                  videoUrl={playlistVideoUrl}
+                  startTime={currentPlaylistItem.lastPosition}
+                  autoPlay={true}
+                  onEnded={handlePlaylistNext}
+                  isFullscreen={playlistFullscreen}
+                  onToggleFullscreen={() => {
+                    const el = playlistModalRef.current;
+                    if (!el) return;
+                    if (document.fullscreenElement) {
+                      document
+                        .exitFullscreen()
+                        .then(() => setPlaylistFullscreen(false));
+                    } else {
+                      el.requestFullscreen()
+                        .then(() => setPlaylistFullscreen(true))
+                        .catch(() => {});
+                    }
+                  }}
+                />
+              )}
             </div>
           </div>
 
           {/* 하단 플레이리스트 큐 */}
-          <div className="bg-gray-900/80 px-6 py-3">
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {playlist.map((item, idx) => (
-                <button
-                  key={`${item.contentId}-${item.episodeId ?? "s"}-${idx}`}
-                  onClick={() => setPlaylistIndex(idx)}
-                  className={`flex-shrink-0 w-48 rounded-lg overflow-hidden transition-all ${
-                    idx === playlistIndex
-                      ? "ring-2 ring-primary"
-                      : "opacity-60 hover:opacity-100"
-                  }`}
-                >
-                  <div className="relative">
-                    <img
-                      src={
-                        item.thumbnailUrl ||
-                        "https://via.placeholder.com/192x108?text=No+Image"
-                      }
-                      alt={item.title}
-                      className="w-full h-[108px] object-cover"
-                    />
-                    {item.progressPercent > 0 && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
-                        <div
-                          className="h-full bg-primary"
-                          style={{ width: `${item.progressPercent}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-2 bg-gray-800 text-left">
-                    <p className="text-xs truncate">{item.title}</p>
-                    {item.episodeTitle && (
-                      <p className="text-xs text-gray-500 truncate">
-                        {item.episodeTitle}
-                      </p>
-                    )}
-                  </div>
-                </button>
-              ))}
+          {!playlistFullscreen && (
+            <div className="bg-gray-900/80 px-6 py-3">
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {playlist.map((item, idx) => (
+                  <button
+                    key={`${item.contentId}-${item.episodeId ?? "s"}-${idx}`}
+                    onClick={() => setPlaylistIndex(idx)}
+                    className={`flex-shrink-0 w-48 rounded-lg overflow-hidden transition-all ${
+                      idx === playlistIndex
+                        ? "ring-2 ring-primary"
+                        : "opacity-60 hover:opacity-100"
+                    }`}
+                  >
+                    <div className="relative">
+                      <img
+                        src={
+                          item.thumbnailUrl ||
+                          "https://via.placeholder.com/192x108?text=No+Image"
+                        }
+                        alt={item.title}
+                        className="w-full h-[108px] object-cover"
+                      />
+                      {item.progressPercent > 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+                          <div
+                            className="h-full bg-primary"
+                            style={{ width: `${item.progressPercent}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2 bg-gray-800 text-left">
+                      <p className="text-xs truncate">{item.title}</p>
+                      {item.episodeTitle && (
+                        <p className="text-xs text-gray-500 truncate">
+                          {item.episodeTitle}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

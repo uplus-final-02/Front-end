@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import {
   MessageCircle,
   Share2,
@@ -75,6 +76,8 @@ const parseDescription = (desc: any): string | null => {
 type PanelType = "comments" | "info" | null;
 
 const CreatorPage: React.FC = () => {
+  const { videoId: paramVideoId } = useParams<{ videoId?: string }>();
+
   // ── 피드 상태 ──
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [nextSeedId, setNextSeedId] = useState<number | null>(null);
@@ -148,6 +151,33 @@ const CreatorPage: React.FC = () => {
   useEffect(() => {
     loadFeed(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── URL 파라미터로 진입 시 해당 영상으로 이동 ──
+  useEffect(() => {
+    if (!paramVideoId || feedItems.length === 0) return;
+    const targetId = Number(paramVideoId);
+    if (isNaN(targetId)) return;
+    const idx = feedItems.findIndex((item) => item.userContentId === targetId);
+    if (idx >= 0 && idx !== currentIndex) {
+      setCurrentIndex(idx);
+      const container = containerRef.current;
+      if (container) {
+        container.scrollTo({
+          top: idx * container.clientHeight,
+          behavior: "instant",
+        });
+      }
+    }
+  }, [feedItems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 현재 영상 변경 시 URL 업데이트 ──
+  useEffect(() => {
+    if (!currentItem) return;
+    const newPath = `/creator/${currentItem.userContentId}`;
+    if (window.location.pathname !== newPath) {
+      window.history.replaceState(null, "", newPath);
+    }
+  }, [currentItem?.userContentId]);
 
   // ── 현재 영상 play 정보 로드 ──
   useEffect(() => {
@@ -232,7 +262,10 @@ const CreatorPage: React.FC = () => {
   };
 
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
+    const url = currentItem
+      ? `${window.location.origin}/creator/${currentItem.userContentId}`
+      : window.location.href;
+    navigator.clipboard.writeText(url);
     alert("URL이 복사되었습니다.");
   };
 

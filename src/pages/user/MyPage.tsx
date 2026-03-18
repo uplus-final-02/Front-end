@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { profileService } from "@/services/profileService";
 import { authService, type WithdrawalReason } from "@/services/authService";
 import { bookmarkService } from "@/services/bookmarkService";
+import { contentService } from "@/services/contentService";
 import type { BookmarkItem, PlaylistItem } from "@/types/bookmark";
 import {
   historyService,
@@ -45,6 +46,21 @@ import type { Profile } from "@/types/profile";
 import ContentCard from "@/components/content/ContentCard";
 import ContentModal from "@/components/content/ContentModal";
 import type { Content } from "@/types";
+
+const bookmarkToContent = (bookmark: BookmarkItem): Content => ({
+  id: bookmark.contentId.toString(),
+  title: bookmark.title,
+  thumbnailUrl: bookmark.thumbnailUrl,
+  tags: bookmark.category ? [bookmark.category] : [],
+  isSeries: bookmark.contentType === "SERIES",
+  // Fill with default values for ContentCard compatibility
+  description: "",
+  viewCount: 0,
+  bookmarkCount: 0,
+  duration: 0,
+  episodes: [],
+  isOriginal: false,
+});
 
 type Tab = "profile" | "bookmarks" | "history" | "stats" | "subscription";
 
@@ -86,6 +102,7 @@ const MyPage: React.FC = () => {
 
   // 콘텐츠 모달
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
+  const [contentLoading, setContentLoading] = useState(false);
 
   // 플레이리스트 연속 재생
   const [playlist, setPlaylist] = useState<PlaylistItem[]>([]);
@@ -421,29 +438,24 @@ const MyPage: React.FC = () => {
     }
   };
 
-  const handleContentClick = (bookmark: BookmarkItem) => {
-    const content: Content = bookmarkToContent(bookmark);
-    setSelectedContent(content);
+  const handleContentClick = async (bookmark: BookmarkItem) => {
+    if (contentLoading) return;
+    setContentLoading(true);
+    try {
+      const fullContent = await contentService.getContentById(
+        bookmark.contentId.toString(),
+      );
+      setSelectedContent(fullContent);
+    } catch (error) {
+      console.error("콘텐츠 상세 정보 조회 실패:", error);
+      showAlert("콘텐츠 정보를 불러오는 데 실패했습니다.", "error");
+    } finally {
+      setContentLoading(false);
+    }
   };
 
   const handleBookmarkPlay = (bookmark: BookmarkItem) => {
     navigate(`/content/${bookmark.contentId}`);
-  };
-
-  const bookmarkToContent = (bookmark: BookmarkItem): Content => {
-    return {
-      id: bookmark.contentId.toString(),
-      title: bookmark.title,
-      thumbnailUrl: bookmark.thumbnailUrl,
-      rating: 0,
-      year: new Date().getFullYear(),
-      duration: 0,
-      description: "",
-      tags: bookmark.category ? [bookmark.category] : [],
-      accessLevel: "FREE",
-      viewCount: 0,
-      isSeries: bookmark.contentType === "SERIES",
-    };
   };
 
   const handleSaveNickname = async () => {
@@ -1231,13 +1243,9 @@ const MyPage: React.FC = () => {
                               ? toggleBookmarkSelect(bookmark.contentId)
                               : handleContentClick(bookmark)
                           }
-                          onPlayClick={
-                            selectMode
-                              ? undefined
-                              : () => handleBookmarkPlay(bookmark)
-                          }
+                          onPlayClick={() => handleBookmarkPlay(bookmark)}
+                          simpleHover={!selectMode}
                           noScale={selectMode}
-                          simpleHover={true}
                           onBookmarkToggle={
                             selectMode ? undefined : handleBookmarkRemove
                           }

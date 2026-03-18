@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import VideoPlayer from "@/components/common/VideoPlayer";
 import ContentModal from "@/components/content/ContentModal";
+import { useAuth } from "@/contexts/AuthContext";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { contentService } from "@/services/contentService";
 import {
   creatorService,
@@ -23,6 +25,7 @@ import {
   UserContentPlayInfo,
   Comment,
 } from "@/services/creatorService";
+import { commentService } from "@/services/commentService";
 import type { Content } from "@/types";
 
 // ── 유틸 ──
@@ -70,6 +73,7 @@ type PanelType = "comments" | "info" | null;
 
 const CreatorPage: React.FC = () => {
   const { videoId: paramVideoId } = useParams<{ videoId?: string }>();
+  const { user } = useAuth();
 
   // ── 피드 상태 ──
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
@@ -91,6 +95,11 @@ const CreatorPage: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+  const [deleteTargetCommentId, setDeleteTargetCommentId] = useState<
+    number | null
+  >(null);
 
   // ── refs ──
   const viewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,6 +270,42 @@ const CreatorPage: React.FC = () => {
       loadComments();
     } catch (e) {
       console.error("댓글 작성 실패:", e);
+    }
+  };
+
+  const handleEditComment = (c: Comment) => {
+    setEditingCommentId(c.commentId);
+    setEditingCommentText(c.body);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditingCommentText("");
+  };
+
+  const handleSaveEdit = async (commentId: number) => {
+    if (!playInfo?.videoId || !editingCommentText.trim()) return;
+    try {
+      await commentService.updateComment(
+        playInfo.videoId,
+        commentId,
+        editingCommentText.trim(),
+      );
+      setEditingCommentId(null);
+      setEditingCommentText("");
+      loadComments();
+    } catch (e) {
+      console.error("댓글 수정 실패:", e);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!playInfo?.videoId) return;
+    try {
+      await creatorService.deleteComment(playInfo.videoId, commentId);
+      loadComments();
+    } catch (e) {
+      console.error("댓글 삭제 실패:", e);
     }
   };
 
@@ -461,9 +506,66 @@ const CreatorPage: React.FC = () => {
                                 {formatTimeAgo(c.createdAt)}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-300 leading-relaxed">
-                              {c.body}
-                            </p>
+                            {editingCommentId === c.commentId ? (
+                              <div className="mt-1">
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    value={editingCommentText}
+                                    onChange={(e) =>
+                                      setEditingCommentText(e.target.value)
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter")
+                                        handleSaveEdit(c.commentId);
+                                      if (e.key === "Escape")
+                                        handleCancelEdit();
+                                    }}
+                                    className="flex-1 bg-transparent border-b border-gray-700 focus:border-primary outline-none py-1 text-sm"
+                                    autoFocus
+                                  />
+                                </div>
+                                <div className="flex gap-2 mt-1">
+                                  <button
+                                    onClick={() => handleSaveEdit(c.commentId)}
+                                    className="text-xs text-primary hover:text-primary/80"
+                                  >
+                                    저장
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    className="text-xs text-gray-500 hover:text-gray-300"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <p className="text-sm text-gray-300 leading-relaxed">
+                                  {c.body}
+                                </p>
+                                {user &&
+                                  String(user.id) === String(c.userId) && (
+                                    <div className="flex gap-2 mt-1">
+                                      <button
+                                        onClick={() => handleEditComment(c)}
+                                        className="text-xs text-gray-500 hover:text-primary transition-colors"
+                                      >
+                                        수정
+                                      </button>
+                                      <button
+                                        onClick={() =>
+                                          setDeleteTargetCommentId(c.commentId)
+                                        }
+                                        className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                                      >
+                                        삭제
+                                      </button>
+                                    </div>
+                                  )}
+                              </>
+                            )}
                           </div>
                         </div>
                       ))
@@ -571,6 +673,20 @@ const CreatorPage: React.FC = () => {
         <ContentModal
           content={selectedParentContent}
           onClose={() => setSelectedParentContent(null)}
+        />
+      )}
+
+      {/* 댓글 삭제 확인 모달 */}
+      {deleteTargetCommentId !== null && (
+        <ConfirmModal
+          message="댓글을 삭제하시겠습니까?"
+          confirmText="삭제"
+          cancelText="취소"
+          onConfirm={() => {
+            handleDeleteComment(deleteTargetCommentId);
+            setDeleteTargetCommentId(null);
+          }}
+          onCancel={() => setDeleteTargetCommentId(null)}
         />
       )}
     </>

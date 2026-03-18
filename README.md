@@ -118,16 +118,11 @@ npm run build
 npm run preview
 ```
 
-## 환경 변수
-
-```env
-VITE_API_BASE_URL=       # 백엔드 API 베이스 URL
-```
-
 ## 디자인
 
 | 항목       | 값                                                        |
 | ---------- | --------------------------------------------------------- |
+| 글꼴       | S-CoreDream (100~900 웨이트)                              |
 | Primary    | `#EB008B`                                                 |
 | Background | `#141414`                                                 |
 | Theme      | Dark Mode                                                 |

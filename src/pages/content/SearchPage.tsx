@@ -6,7 +6,6 @@ import { searchService, type SearchParams } from "@/services/searchService";
 import ContentCard from "@/components/content/ContentCard";
 import ContentModal from "@/components/content/ContentModal";
 
-type SortType = "RELATED" | "LATEST" | "POPULAR";
 type SearchTab = "ott" | "creator";
 
 const PAGE_SIZE = 15;
@@ -21,7 +20,6 @@ const SearchPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedContent, setSelectedContent] = useState<Content | null>(null);
-  const [sortType, setSortType] = useState<SortType>("RELATED");
   const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
   const [hasNext, setHasNext] = useState(false);
   const [page, setPage] = useState(0);
@@ -68,7 +66,6 @@ const SearchPage: React.FC = () => {
     async (
       query: string,
       tag: string | undefined,
-      sort: SortType,
       pageNum: number,
       append: boolean = false,
     ) => {
@@ -85,7 +82,7 @@ const SearchPage: React.FC = () => {
       setError(null);
       try {
         const params: SearchParams = {
-          sort,
+          sort: "RELATED",
           page: pageNum,
           size: PAGE_SIZE,
         };
@@ -152,17 +149,11 @@ const SearchPage: React.FC = () => {
     // URL에 쿼리나 태그가 있을 때만 자동 검색
     if (initialQuery || initialTag) {
       setSelectedTag(initialTag || undefined);
-      doSearch(initialQuery, initialTag || undefined, sortType, 0);
+      doSearch(initialQuery, initialTag || undefined, 0);
       if (initialQuery) doCreatorSearch(initialQuery, 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery, initialTag]);
-
-  // 정렬 변경 시 재검색
-  const handleSortChange = (sort: SortType) => {
-    setSortType(sort);
-    doSearch(searchQuery, selectedTag, sort, 0);
-  };
 
   // 태그 클릭 (토글)
   const handleTagClick = (tagName: string) => {
@@ -172,7 +163,7 @@ const SearchPage: React.FC = () => {
     if (searchQuery.trim()) params.q = searchQuery;
     if (newTag) params.tag = newTag;
     setSearchParams(params);
-    doSearch(searchQuery, newTag, sortType, 0);
+    doSearch(searchQuery, newTag, 0);
   };
 
   // 검색 폼 제출
@@ -183,13 +174,13 @@ const SearchPage: React.FC = () => {
     const params: Record<string, string> = {};
     if (searchQuery.trim()) params.q = searchQuery;
     setSearchParams(params);
-    doSearch(searchQuery, undefined, sortType, 0);
+    doSearch(searchQuery, undefined, 0);
     if (searchQuery.trim()) doCreatorSearch(searchQuery, 0);
   };
 
   // 더보기
   const handleLoadMore = () => {
-    doSearch(searchQuery, selectedTag, sortType, page + 1, true);
+    doSearch(searchQuery, selectedTag, page + 1, true);
   };
 
   // 자동완성 입력 핸들러
@@ -220,7 +211,7 @@ const SearchPage: React.FC = () => {
     setShowSuggestions(false);
     setSelectedTag(undefined);
     setSearchParams({ q: text });
-    doSearch(text, undefined, sortType, 0);
+    doSearch(text, undefined, 0);
     doCreatorSearch(text, 0);
   };
 
@@ -292,66 +283,41 @@ const SearchPage: React.FC = () => {
         </section>
 
         {/* 탭 */}
-        {hasSearchQuery && (
-          <div className="mb-6 flex gap-4 border-b border-gray-800">
-            <button
-              onClick={() => setActiveTab("ott")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                activeTab === "ott"
-                  ? "text-primary"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              OTT 콘텐츠 {results.length > 0 && `(${results.length})`}
-              {activeTab === "ott" && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("creator")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                activeTab === "creator"
-                  ? "text-primary"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              크리에이터{" "}
-              {creatorResults.length > 0 && `(${creatorResults.length})`}
-              {activeTab === "creator" && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* 정렬 (OTT 탭에서만) */}
-        {activeTab === "ott" && (
-          <section className="mb-6 flex items-center justify-between">
-            {hasSearchQuery && (
-              <p className="text-gray-400 text-sm">
-                {message || `검색 결과 ${results.length}개`}
-              </p>
+        <div className="mb-6 flex gap-4 border-b border-gray-800">
+          <button
+            onClick={() => setActiveTab("ott")}
+            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+              activeTab === "ott"
+                ? "text-primary"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            OTT 콘텐츠 {results.length > 0 && `(${results.length})`}
+            {activeTab === "ott" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
             )}
-            <div className="flex gap-2 ml-auto">
-              {(["RELATED", "LATEST", "POPULAR"] as SortType[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleSortChange(s)}
-                  className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                    sortType === s
-                      ? "bg-primary text-white"
-                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                  }`}
-                >
-                  {s === "RELATED"
-                    ? "관련도순"
-                    : s === "LATEST"
-                      ? "최신순"
-                      : "인기순"}
-                </button>
-              ))}
-            </div>
-          </section>
+          </button>
+          <button
+            onClick={() => setActiveTab("creator")}
+            className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+              activeTab === "creator"
+                ? "text-primary"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            크리에이터{" "}
+            {creatorResults.length > 0 && `(${creatorResults.length})`}
+            {activeTab === "creator" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+            )}
+          </button>
+        </div>
+
+        {/* OTT 결과 메시지 */}
+        {activeTab === "ott" && hasSearchQuery && (
+          <p className="text-gray-400 text-sm mb-4">
+            {message || `검색 결과 ${results.length}개`}
+          </p>
         )}
 
         {/* OTT 콘텐츠 그리드 */}
@@ -371,9 +337,7 @@ const SearchPage: React.FC = () => {
                 </div>
                 <p className="text-red-400 mb-2">{error}</p>
                 <button
-                  onClick={() =>
-                    doSearch(searchQuery, selectedTag, sortType, 0)
-                  }
+                  onClick={() => doSearch(searchQuery, selectedTag, 0)}
                   className="btn-secondary mt-4"
                 >
                   다시 시도

@@ -49,7 +49,7 @@ const ContentDetailPage: React.FC = () => {
   const [showAutoplayOverlay, setShowAutoplayOverlay] = useState(false);
   const [autoplayCountdown, setAutoplayCountdown] = useState(0);
   const autoplayTimerRef = useRef<number | null>(null);
-
+const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const shouldAutoPlay = searchParams.get("autoplay") === "true";
   const episodeParam = searchParams.get("episode");
 
@@ -143,19 +143,33 @@ const ContentDetailPage: React.FC = () => {
       const targetEp = episodeParam
         ? content.episodes.find((ep) => ep.id === episodeParam)
         : content.episodes[0];
+
       const ep = targetEp || content.episodes[0];
       setCurrentEpisode(ep);
-      loadPlayInfo(ep.id);
+      setCurrentVideoId(ep.id);
     } else if (!content.isSeries) {
       // 단일 영상: episodes에서 videoId를 가져옴 (contentId ≠ videoId)
       if (content.episodes && content.episodes.length > 0) {
-        loadPlayInfo(content.episodes[0].id);
+        setCurrentVideoId(content.episodes[0].id);
       } else {
         // videoId를 알 수 없으면 콘텐츠 정보만 표시
         setPlayError("재생 가능한 영상 정보를 찾을 수 없습니다.");
       }
     }
-  }, [content]);
+
+  }, [content, episodeParam]);
+
+  // 재생 정보
+  useEffect(() => {
+    if (!currentVideoId || !user) return;
+    loadPlayInfo(currentVideoId);
+  }, [currentVideoId, user]);
+
+  // 댓글 조회
+  useEffect(() => {
+    if (!currentVideoId) return;
+    loadComments(currentVideoId);
+  }, [currentVideoId]);
 
   const loadContent = async () => {
     if (!id) return;
@@ -194,7 +208,7 @@ const ContentDetailPage: React.FC = () => {
       }
 
       // 댓글 로드
-      loadComments();
+      // await loadComments(videoId);
 
       if (!info.url) {
         setPlayError("현재 재생 가능한 영상이 없습니다.");
@@ -216,7 +230,7 @@ const ContentDetailPage: React.FC = () => {
           try {
             await videoService.increaseViewCount(videoId);
           } catch {}
-          loadComments();
+          // await loadComments(videoId);
           if (!retryInfo.url) {
             setPlayError("현재 재생 가능한 영상이 없습니다.");
           }
@@ -234,15 +248,17 @@ const ContentDetailPage: React.FC = () => {
     }
   };
 
-  const loadComments = async () => {
-    if (!currentVideoIdRef.current) return;
-    try {
-      const data = await commentService.getComments(currentVideoIdRef.current);
-      setComments(data.content);
-    } catch (error) {
-      console.error("댓글 로딩 실패:", error);
-    }
-  };
+  // 댓글 로드 함수
+  const loadComments = async (videoId: string) => {
+  if (!videoId) return;
+
+  try {
+    const data = await commentService.getComments(videoId);
+    setComments(data.content);
+  } catch (error) {
+    console.error("댓글 로딩 실패:", error);
+  }
+};
 
   const handleToggleBookmark = async () => {
     if (!id || !user) {
@@ -304,7 +320,9 @@ const ContentDetailPage: React.FC = () => {
     }
     setCurrentEpisode(episode);
     setPlayInfo(null);
-    loadPlayInfo(episode.id);
+    // loadPlayInfo(episode.id);
+    setCurrentVideoId(episode.id);
+    currentVideoIdRef.current = episode.id;
   };
 
   // 다음/이전 에피소드 이동 (play API context 활용)
@@ -335,7 +353,7 @@ const ContentDetailPage: React.FC = () => {
       );
       setCommentText("");
       // 댓글 목록 새로고침
-      loadComments();
+      await loadComments(currentVideoIdRef.current);
     } catch (error) {
       console.error("댓글 작성 실패:", error);
     }
@@ -346,7 +364,7 @@ const ContentDetailPage: React.FC = () => {
     try {
       await commentService.deleteComment(currentVideoIdRef.current, commentId);
       setDeleteTargetCommentId(null);
-      loadComments();
+      await loadComments(currentVideoIdRef.current);
     } catch (error) {
       console.error("댓글 삭제 실패:", error);
     }
@@ -373,7 +391,7 @@ const ContentDetailPage: React.FC = () => {
       );
       setEditingCommentId(null);
       setEditingCommentText("");
-      loadComments();
+      await loadComments(currentVideoIdRef.current);
     } catch (error) {
       console.error("댓글 수정 실패:", error);
     }

@@ -25,12 +25,17 @@ import type { BookmarkItem, PlaylistItem } from "@/types/bookmark";
 import {
   historyService,
   type WatchHistoryItem,
+  type UserContentWatchHistoryGroup,
 } from "@/services/historyService";
 import { statsService, type WatchStatistics } from "@/services/historyService";
 import {
   subscriptionService,
   type SubscriptionInfo,
 } from "@/services/subscriptionService";
+import {
+  creatorService,
+  type UserContentPlayInfo,
+} from "@/services/creatorService";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import AlertModal from "@/components/common/AlertModal";
 import VideoPlayer from "@/components/common/VideoPlayer";
@@ -40,6 +45,15 @@ import ContentModal from "@/components/content/ContentModal";
 import type { Content } from "@/types";
 
 type Tab = "profile" | "bookmarks" | "history" | "stats" | "subscription";
+
+const formatTimeAgo = (dateStr: string) => {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return "방금 전";
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  return `${days}일 전`;
+};
 
 const MyPage: React.FC = () => {
   const { user, loading: authLoading, logout, updateUser } = useAuth();
@@ -86,6 +100,21 @@ const MyPage: React.FC = () => {
   const [historyCursor, setHistoryCursor] = useState<number | null>(null);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // 크리에이터 시청 이력
+  const [creatorWatchHistory, setCreatorWatchHistory] = useState<
+    UserContentWatchHistoryGroup[]
+  >([]);
+  const [creatorHistoryLoading, setCreatorHistoryLoading] = useState(false);
+
+  // 크리에이터 시청이력 상세 모달
+  const [selectedCreatorHistory, setSelectedCreatorHistory] =
+    useState<UserContentWatchHistoryGroup | null>(null);
+
+  // 크리에이터 영상 재생
+  const [playingVideo, setPlayingVideo] =
+    useState<UserContentPlayInfo | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
 
   // 구독 관련
   const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
@@ -140,6 +169,7 @@ const MyPage: React.FC = () => {
     }
     if (activeTab === "history" && user) {
       loadWatchHistory();
+      loadCreatorWatchHistory();
     }
     if (activeTab === "subscription" && user) {
       loadSubscription();
@@ -303,6 +333,33 @@ const MyPage: React.FC = () => {
     } catch (error) {
       console.error("시청 이력 삭제 실패:", error);
       showAlert("시청 이력 삭제에 실패했습니다.", "error");
+    }
+  };
+
+  const loadCreatorWatchHistory = async () => {
+    setCreatorHistoryLoading(true);
+    try {
+      const data = await historyService.getUserContentWatchHistory();
+      setCreatorWatchHistory(data);
+    } catch (error) {
+      console.error("크리에이터 시청 이력 조회 실패:", error);
+    } finally {
+      setCreatorHistoryLoading(false);
+    }
+  };
+
+  const handlePlayCreatorVideo = async (userContentId: number) => {
+    setVideoLoading(true);
+    try {
+      const playInfo = await creatorService.getPlayInfo(userContentId);
+      setPlayingVideo(playInfo);
+      // 재생 시작 시 상세 모달은 닫기
+      setSelectedCreatorHistory(null);
+    } catch (error) {
+      console.error("영상 재생 정보 조회 실패:", error);
+      showAlert("영상을 불러오는 데 실패했습니다.", "error");
+    } finally {
+      setVideoLoading(false);
     }
   };
 
@@ -1150,12 +1207,15 @@ const MyPage: React.FC = () => {
 
         {/* 시청 이력 탭 */}
         {activeTab === "history" && (
-          <div className="max-w-5xl mx-auto">
-            {historyLoading && watchHistory.length === 0 ? (
+          <div className="max-w-7xl mx-auto">
+            {(historyLoading || creatorHistoryLoading) &&
+            watchHistory.length === 0 &&
+            creatorWatchHistory.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
               </div>
-            ) : watchHistory.length === 0 ? (
+            ) : watchHistory.length === 0 &&
+              creatorWatchHistory.length === 0 ? (
               <div className="text-center py-12">
                 <History className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-400 mb-4">시청 이력이 없습니다.</p>
@@ -1164,123 +1224,167 @@ const MyPage: React.FC = () => {
                 </button>
               </div>
             ) : (
-              <>
-                <div className="space-y-3">
-                  {watchHistory.map((item) => (
-                    <div
-                      key={item.historyId}
-                      className="bg-gray-900 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-800/80 transition-colors"
-                    >
-                      <div
-                        className="relative flex-shrink-0 cursor-pointer group"
-                        onClick={() =>
-                          navigate(
-                            `/content/${item.contentId}${item.episodeId ? `?episode=${item.episodeId}` : ""}`,
-                          )
-                        }
-                      >
-                        <img
-                          src={
-                            item.thumbnailUrl ||
-                            "https://via.placeholder.com/160x90?text=No+Image"
-                          }
-                          alt={item.title}
-                          className="w-40 h-[90px] object-cover rounded"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
-                          <Play className="w-8 h-8 fill-current" />
-                        </div>
-                        {item.duration > 0 && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
-                            <div
-                              className="h-full bg-primary"
-                              style={{
-                                width: `${Math.min(item.progressPercent, 100)}%`,
-                              }}
+              <div className="space-y-12">
+                {/* 크리에이터 시청이력 */}
+                {creatorWatchHistory.length > 0 && (
+                  <div>
+                    <h2 className="text-2xl font-bold mb-4">
+                      크리에이터 시청이력
+                    </h2>
+                    <div className="flex space-x-4 overflow-x-auto pb-4 -mx-4 px-4">
+                      {creatorWatchHistory.map((group) => (
+                        <div
+                          key={group.parentContentId}
+                          className="w-72 flex-shrink-0 cursor-pointer group"
+                          onClick={() => setSelectedCreatorHistory(group)}
+                        >
+                          <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-800 mb-2">
+                            <img
+                              src={
+                                group.parentThumbnailUrl ||
+                                "https://via.placeholder.com/320x180?text=No+Image"
+                              }
+                              alt={group.parentTitle}
+                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
                             />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Play className="w-10 h-10" />
+                            </div>
+                            <div className="absolute top-2 right-2 bg-black/70 rounded px-2 py-1 text-xs">
+                              {group.watchHistories.length}개 영상
+                            </div>
                           </div>
-                        )}
-                      </div>
-
-                      <div
-                        className="flex-1 min-w-0 cursor-pointer"
-                        onClick={() =>
-                          navigate(
-                            `/content/${item.contentId}${item.episodeId ? `?episode=${item.episodeId}` : ""}`,
-                          )
-                        }
-                      >
-                        <h3 className="font-semibold text-base line-clamp-1 mb-1">
-                          {item.title}
-                          {item.episodeTitle && (
-                            <span className="text-gray-400 font-normal">
-                              {" "}
-                              · {item.episodeNumber}화 {item.episodeTitle}
-                            </span>
-                          )}
-                        </h3>
-                        <div className="flex items-center gap-3 text-sm text-gray-400">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
-                            {formatDuration(item.lastPosition)} /{" "}
-                            {formatDuration(item.duration)}
-                          </span>
-                          <span>{item.progressPercent}% 시청</span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-xs ${
-                              item.status === "COMPLETED"
-                                ? "bg-green-500/20 text-green-400"
-                                : item.status === "WATCHING"
-                                  ? "bg-blue-500/20 text-blue-400"
-                                  : "bg-gray-700 text-gray-400"
-                            }`}
-                          >
-                            {item.status === "COMPLETED"
-                              ? "시청 완료"
-                              : item.status === "WATCHING"
-                                ? "시청 중"
-                                : "시작됨"}
-                          </span>
+                          <h3 className="font-semibold truncate">
+                            {group.parentTitle}
+                          </h3>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {new Date(item.watchedAt).toLocaleDateString(
-                            "ko-KR",
-                            {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            },
-                          )}
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => handleDeleteHistory(item.historyId)}
-                        className="flex-shrink-0 p-2 text-gray-500 hover:text-red-400 transition-colors"
-                        title="시청 이력 삭제"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
-
-                {hasMoreHistory && (
-                  <div className="text-center mt-8">
-                    <button
-                      onClick={() =>
-                        loadWatchHistory(historyCursor ?? undefined)
-                      }
-                      disabled={historyLoading}
-                      className="btn-secondary"
-                    >
-                      {historyLoading ? "로딩 중..." : "더보기"}
-                    </button>
                   </div>
                 )}
-              </>
+
+                {/* OTT 시청이력 */}
+                {watchHistory.length > 0 && (
+                  <div>
+                    <h2 className="text-2xl font-bold mb-4">OTT 시청이력</h2>
+                    <div className="space-y-3">
+                      {watchHistory.map((item) => (
+                        <div
+                          key={item.historyId}
+                          className="bg-gray-900 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-800/80 transition-colors"
+                        >
+                          <div
+                            className="relative flex-shrink-0 cursor-pointer group"
+                            onClick={() =>
+                              navigate(
+                                `/content/${item.contentId}${item.episodeId ? `?episode=${item.episodeId}` : ""}`,
+                              )
+                            }
+                          >
+                            <img
+                              src={
+                                item.thumbnailUrl ||
+                                "https://via.placeholder.com/160x90?text=No+Image"
+                              }
+                              alt={item.title}
+                              className="w-40 h-[90px] object-cover rounded"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                              <Play className="w-8 h-8 fill-current" />
+                            </div>
+                            {item.duration > 0 && (
+                              <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700">
+                                <div
+                                  className="h-full bg-primary"
+                                  style={{
+                                    width: `${Math.min(item.progressPercent, 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          <div
+                            className="flex-1 min-w-0 cursor-pointer"
+                            onClick={() =>
+                              navigate(
+                                `/content/${item.contentId}${item.episodeId ? `?episode=${item.episodeId}` : ""}`,
+                              )
+                            }
+                          >
+                            <h3 className="font-semibold text-base line-clamp-1 mb-1">
+                              {item.title}
+                              {item.episodeTitle && (
+                                <span className="text-gray-400 font-normal">
+                                  {" "}
+                                  · {item.episodeNumber}화 {item.episodeTitle}
+                                </span>
+                              )}
+                            </h3>
+                            <div className="flex items-center gap-3 text-sm text-gray-400">
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5" />
+                                {formatDuration(item.lastPosition)} /{" "}
+                                {formatDuration(item.duration)}
+                              </span>
+                              <span>{item.progressPercent}% 시청</span>
+                              <span
+                                className={`px-2 py-0.5 rounded text-xs ${
+                                  item.status === "COMPLETED"
+                                    ? "bg-green-500/20 text-green-400"
+                                    : item.status === "WATCHING"
+                                      ? "bg-blue-500/20 text-blue-400"
+                                      : "bg-gray-700 text-gray-400"
+                                }`}
+                              >
+                                {item.status === "COMPLETED"
+                                  ? "시청 완료"
+                                  : item.status === "WATCHING"
+                                    ? "시청 중"
+                                    : "시작됨"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {new Date(item.watchedAt).toLocaleDateString(
+                                "ko-KR",
+                                {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => handleDeleteHistory(item.historyId)}
+                            className="flex-shrink-0 p-2 text-gray-500 hover:text-red-400 transition-colors"
+                            title="시청 이력 삭제"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {hasMoreHistory && (
+                      <div className="text-center mt-8">
+                        <button
+                          onClick={() =>
+                            loadWatchHistory(historyCursor ?? undefined)
+                          }
+                          disabled={historyLoading}
+                          className="btn-secondary"
+                        >
+                          {historyLoading ? "로딩 중..." : "더보기"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -1760,6 +1864,102 @@ const MyPage: React.FC = () => {
             cb?.();
           }}
         />
+      )}
+
+      {/* 크리에이터 시청이력 상세 모달 */}
+      {selectedCreatorHistory && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setSelectedCreatorHistory(null)}
+        >
+          <div
+            className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-gray-800 flex-shrink-0">
+              <h2 className="text-2xl font-bold">
+                {selectedCreatorHistory.parentTitle}
+              </h2>
+              <button
+                onClick={() => setSelectedCreatorHistory(null)}
+                className="p-2 rounded-full hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-4 gap-y-6">
+                {selectedCreatorHistory.watchHistories.map((item) => (
+                  <div
+                    key={item.historyId}
+                    className="cursor-pointer group"
+                    onClick={() => handlePlayCreatorVideo(item.userContentId)}
+                  >
+                    <div className="relative aspect-[9/16] rounded-lg overflow-hidden bg-gray-800 mb-2 transition-all duration-300 group-hover:ring-2 ring-primary">
+                      <img
+                        src={
+                          item.thumbnailUrl ||
+                          "https://via.placeholder.com/270x480?text=No+Image"
+                        }
+                        alt={item.title}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play className="w-10 h-10" />
+                      </div>
+                    </div>
+                    <h3 className="text-sm font-semibold truncate">
+                      {item.title}
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      {formatTimeAgo(item.lastWatchedAt)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 크리에이터 영상 재생 모달 */}
+      {(playingVideo || videoLoading) && (
+        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
+          {videoLoading ? (
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          ) : (
+            playingVideo && (
+              <div className="relative w-full h-full max-w-md mx-auto flex flex-col justify-center">
+                <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-10">
+                  <div className="flex items-start justify-between gap-4">
+                    <h3 className="font-semibold text-lg leading-tight">
+                      {playingVideo.title}
+                    </h3>
+                    <button
+                      onClick={() => setPlayingVideo(null)}
+                      className="p-2 rounded-full bg-black/30 hover:bg-black/60 transition-colors flex-shrink-0"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="w-full h-full [&>div]:!h-full">
+                  <VideoPlayer
+                    videoUrl={playingVideo.url || ""}
+                    autoPlay={true}
+                    shortsMode={true}
+                    onEnded={() => setPlayingVideo(null)}
+                    startTime={
+                      playingVideo.playbackState?.startPositionSec ?? 0
+                    }
+                  />
+                </div>
+              </div>
+            )
+          )}
+        </div>
       )}
     </div>
   );

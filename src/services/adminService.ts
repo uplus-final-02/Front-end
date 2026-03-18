@@ -5,6 +5,15 @@ import type {
   AdminUserDetail,
   AdminUserListParams,
   PageResponse,
+  AdminMetricsDashboard,
+  AdminSnapshotBucketListParams,
+  AdminSnapshotBucketPageResponse,
+  AdminTrendingTimelineParams,
+  AdminTrendingTimelineResponse,
+  AdminTrendingDetailParams,
+  AdminTrendingDetailResponse,
+  AdminTrendingVerifyParams,
+  AdminTrendingVerifyResponse,
 } from "@/types";
 
 // 관리자 콘텐츠 관련 타입
@@ -263,4 +272,50 @@ export const adminService = {
     });
     return response.data.data;
   },
+
+  // =========================
+  // 인기차트(Trending) 운영
+  // Base Path: /admin/metrics
+  // =========================
+  async getMetricsDashboard(): Promise<AdminMetricsDashboard> {
+    const { data } = await apiClient.get("/admin/metrics/dashboard");
+    return data;
+  },
+
+  async getSnapshotBuckets(
+    params: AdminSnapshotBucketListParams
+  ): Promise<AdminSnapshotBucketPageResponse> {
+    const { data } = await apiClient.get("/admin/metrics/snapshots/buckets", {
+      params,
+    });
+    return data;
+  },
+
+  async getTrendingTimeline(
+    params: AdminTrendingTimelineParams
+  ): Promise<AdminTrendingTimelineResponse> {
+    const { data } = await apiClient.get("/admin/metrics/trending/timeline", {
+      params,
+    });
+    return data;
+  },
+
+  async getTrendingDetail(
+    params: AdminTrendingDetailParams
+  ): Promise<AdminTrendingDetailResponse> {
+    const { data } = await apiClient.get("/admin/metrics/trending/detail", {
+      params,
+    });
+    return data;
+  },
+
+  async getTrendingVerify(
+    params: AdminTrendingVerifyParams
+  ): Promise<AdminTrendingVerifyResponse> {
+    const { data } = await apiClient.get("/admin/metrics/trending/verify", {
+      params,
+    });
+    return data;
+  },
+
 };

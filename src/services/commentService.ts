@@ -17,6 +17,15 @@ export interface CommentPage {
   last: boolean;
 }
 
+const CF_DOMAIN = "https://dpfh72fut41hj.cloudfront.net";
+
+/** 상대 경로인 profileImageUrl에 CloudFront 도메인 prefix 추가 */
+const normalizeProfileUrl = (url: string | null): string | null => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return `${CF_DOMAIN}/${url}`;
+};
+
 export const commentService = {
   /** 댓글 조회 (페이지네이션) */
   getComments: async (
@@ -27,7 +36,12 @@ export const commentService = {
     const response = await apiClient.get(`/api/videos/${videoId}/comments`, {
       params: { page, size },
     });
-    return response.data.data;
+    const data: CommentPage = response.data.data;
+    data.content = data.content.map((c) => ({
+      ...c,
+      profileImageUrl: normalizeProfileUrl(c.profileImageUrl),
+    }));
+    return data;
   },
 
   /** 댓글 작성 */

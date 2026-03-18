@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  User,
 } from "lucide-react";
 import { Content, Episode } from "@/types";
 import { contentService } from "@/services/contentService";
@@ -49,7 +50,7 @@ const ContentDetailPage: React.FC = () => {
   const [showAutoplayOverlay, setShowAutoplayOverlay] = useState(false);
   const [autoplayCountdown, setAutoplayCountdown] = useState(0);
   const autoplayTimerRef = useRef<number | null>(null);
-const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const shouldAutoPlay = searchParams.get("autoplay") === "true";
   const episodeParam = searchParams.get("episode");
 
@@ -156,7 +157,6 @@ const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
         setPlayError("재생 가능한 영상 정보를 찾을 수 없습니다.");
       }
     }
-
   }, [content, episodeParam]);
 
   // 재생 정보
@@ -250,15 +250,15 @@ const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
 
   // 댓글 로드 함수
   const loadComments = async (videoId: string) => {
-  if (!videoId) return;
+    if (!videoId) return;
 
-  try {
-    const data = await commentService.getComments(videoId);
-    setComments(data.content);
-  } catch (error) {
-    console.error("댓글 로딩 실패:", error);
-  }
-};
+    try {
+      const data = await commentService.getComments(videoId);
+      setComments(data.content);
+    } catch (error) {
+      console.error("댓글 로딩 실패:", error);
+    }
+  };
 
   const handleToggleBookmark = async () => {
     if (!id || !user) {
@@ -614,13 +614,27 @@ const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
                           className="border-b border-gray-800 pb-3"
                         >
                           <div className="flex items-center gap-2 mb-1">
-                            {comment.profileImageUrl && (
+                            {comment.profileImageUrl ? (
                               <img
                                 src={comment.profileImageUrl}
                                 alt=""
                                 className="w-6 h-6 rounded-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display =
+                                    "none";
+                                  (e.target as HTMLImageElement)
+                                    .parentElement!.querySelector(
+                                      ".profile-fallback",
+                                    )
+                                    ?.classList.remove("hidden");
+                                }}
                               />
-                            )}
+                            ) : null}
+                            <div
+                              className={`w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 ${comment.profileImageUrl ? "hidden profile-fallback" : "profile-fallback"}`}
+                            >
+                              <User className="w-3.5 h-3.5 text-gray-400" />
+                            </div>
                             <span className="font-semibold text-sm">
                               {comment.nickname}
                             </span>
@@ -669,7 +683,7 @@ const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
                             </p>
                           )}
                           {user &&
-                            user.id === comment.userId.toString() &&
+                            String(user.id) === String(comment.userId) &&
                             editingCommentId !== comment.commentId && (
                               <div className="flex gap-2 mt-1">
                                 <button
@@ -890,13 +904,27 @@ const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
                       className="border-b border-gray-800 pb-4"
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        {comment.profileImageUrl && (
+                        {comment.profileImageUrl ? (
                           <img
                             src={comment.profileImageUrl}
                             alt=""
                             className="w-8 h-8 rounded-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
+                              (e.target as HTMLImageElement)
+                                .parentElement!.querySelector(
+                                  ".profile-fallback",
+                                )
+                                ?.classList.remove("hidden");
+                            }}
                           />
-                        )}
+                        ) : null}
+                        <div
+                          className={`w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 ${comment.profileImageUrl ? "hidden profile-fallback" : "profile-fallback"}`}
+                        >
+                          <User className="w-4 h-4 text-gray-400" />
+                        </div>
                         <span className="font-semibold">
                           {comment.nickname}
                         </span>
@@ -941,7 +969,7 @@ const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
                         <p className="text-gray-300">{comment.body}</p>
                       )}
                       {user &&
-                        user.id === comment.userId.toString() &&
+                        String(user.id) === String(comment.userId) &&
                         editingCommentId !== comment.commentId && (
                           <div className="flex gap-3 mt-2">
                             <button

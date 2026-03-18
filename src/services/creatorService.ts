@@ -182,7 +182,16 @@ export const creatorService = {
     const res = await apiClient.get(`/api/videos/${videoId}/comments`, {
       params: { page, size },
     });
-    return res.data.data;
+    const data: CommentPage = res.data.data;
+    data.content = data.content.map((c) => ({
+      ...c,
+      profileImageUrl: c.profileImageUrl
+        ? c.profileImageUrl.startsWith("http")
+          ? c.profileImageUrl
+          : `${CF_DOMAIN}/${c.profileImageUrl}`
+        : null,
+    }));
+    return data;
   },
 
   /**
@@ -286,11 +295,15 @@ export const creatorService = {
     userContentId: number,
     title: string,
     description: string | null,
+    videoStatus?: "PUBLIC" | "PRIVATE",
   ): Promise<void> => {
     const body: Record<string, unknown> = { title };
     if (description) {
       // description 컬럼이 json 타입이므로 JSON 문자열로 감싸서 전송
       body.description = JSON.stringify(description);
+    }
+    if (videoStatus) {
+      body.videoStatus = videoStatus;
     }
     await apiClient.put(`/api/user/contents/${userContentId}/metadata`, body);
   },
@@ -322,9 +335,13 @@ export const creatorService = {
     page = 0,
     size = 20,
   ): Promise<FeedItem[]> => {
-    const res = await apiClient.get("/api/search/creator/user", {
-      params: { uploaderId, page, size },
-    });
-    return res.data.data;
+    try {
+      const res = await apiClient.get("/api/search/creator/user", {
+        params: { uploaderId, page, size },
+      });
+      return res.data.data;
+    } catch {
+      return [];
+    }
   },
 };

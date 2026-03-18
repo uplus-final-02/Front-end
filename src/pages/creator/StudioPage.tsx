@@ -4,20 +4,25 @@ import {
   Upload,
   Video,
   Image as ImageIcon,
-  Tag,
   CheckCircle,
   Loader2,
   AlertCircle,
   Search,
   ArrowLeft,
+  Plus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { SYSTEM_TAGS } from "@/services/mockData";
 import { creatorService, FeedItem } from "@/services/creatorService";
 import { searchService } from "@/services/searchService";
 import type { Content } from "@/types";
 
-type PageStep = "select-parent" | "form" | "uploading" | "done" | "error";
+type PageStep =
+  | "dashboard"
+  | "select-parent"
+  | "form"
+  | "uploading"
+  | "done"
+  | "error";
 
 interface UploadProgress {
   step: string;
@@ -25,7 +30,7 @@ interface UploadProgress {
 }
 
 const StudioPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   // ── 원본 콘텐츠 검색/선택 상태 ──
@@ -46,6 +51,7 @@ const StudioPage: React.FC = () => {
   // ── 내 콘텐츠 상태 ──
   const [myUploads, setMyUploads] = useState<FeedItem[]>([]);
   const [myUploadsLoading, setMyUploadsLoading] = useState(false);
+  const [myUploadsError, setMyUploadsError] = useState(false);
 
   // ── 업로드 폼 상태 ──
   const [formData, setFormData] = useState({
@@ -54,28 +60,27 @@ const StudioPage: React.FC = () => {
     videoFile: null as File | null,
     thumbnailFile: null as File | null,
   });
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [pageStep, setPageStep] = useState<PageStep>("select-parent");
+  const [pageStep, setPageStep] = useState<PageStep>("dashboard");
   const [progress, setProgress] = useState<UploadProgress>({
     step: "",
     percent: 0,
   });
   const [errorMsg, setErrorMsg] = useState("");
-
-  if (!user) {
-    navigate("/login");
-    return null;
-  }
+  const [autoPublished, setAutoPublished] = useState(false);
 
   // ── 내 콘텐츠 로드 ──
   const loadMyUploads = async () => {
     if (!user) return;
+    const numericId = Number(user.id);
+    if (isNaN(numericId)) return;
     setMyUploadsLoading(true);
     try {
-      const data = await creatorService.getMyUploads(Number(user.id));
+      const data = await creatorService.getMyUploads(numericId);
       setMyUploads(data);
+      setMyUploadsError(false);
     } catch (e) {
       console.error("내 콘텐츠 로드 실패:", e);
+      setMyUploadsError(true);
     } finally {
       setMyUploadsLoading(false);
     }
@@ -86,17 +91,43 @@ const StudioPage: React.FC = () => {
     loadMyUploads();
   }, []);
 
+  // 외부 클릭 시 자동완성 닫기
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // ── 로딩 / 미인증 처리 ──
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    navigate("/login");
+    return null;
+  }
+
   // ── 자동완성 (디바운스) ──
   const handleSearchInput = (value: string) => {
     setSearchKeyword(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-
     if (!value.trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-
     debounceRef.current = setTimeout(async () => {
       try {
         const result = await searchService.getSuggestions(value);
@@ -112,7 +143,6 @@ const StudioPage: React.FC = () => {
   const executeSearch = async (keyword?: string) => {
     const q = keyword ?? searchKeyword;
     if (!q.trim()) return;
-
     setShowSuggestions(false);
     setParentLoading(true);
     setHasSearched(true);
@@ -142,36 +172,14 @@ const StudioPage: React.FC = () => {
     setPageStep("form");
   };
 
-  // 외부 클릭 시 자동완성 닫기
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(e.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const handleTagToggle = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-    );
-  };
-
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files && e.target.files[0])
       setFormData({ ...formData, videoFile: e.target.files[0] });
-    }
   };
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files && e.target.files[0])
       setFormData({ ...formData, thumbnailFile: e.target.files[0] });
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -228,7 +236,37 @@ const StudioPage: React.FC = () => {
         );
       }
 
-      setProgress({ step: "완료!", percent: 100 });
+      // 트랜스코딩 완료 대기 후 자동 공개
+      setProgress({ step: "트랜스코딩 대기 중...", percent: 92 });
+      const maxAttempts = 120;
+      let published = false;
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((r) => setTimeout(r, 5000));
+        try {
+          await creatorService.updateMetadata(
+            draft.userContentId,
+            formData.title.trim(),
+            formData.description.trim() || null,
+            "PUBLIC",
+          );
+          published = true;
+          break;
+        } catch {
+          const pct = Math.min(92 + Math.floor((i / maxAttempts) * 7), 99);
+          setProgress({
+            step: `트랜스코딩 처리 중... (${i + 1}회 확인)`,
+            percent: pct,
+          });
+        }
+      }
+
+      if (published) {
+        setProgress({ step: "완료!", percent: 100 });
+        setAutoPublished(true);
+      } else {
+        setProgress({ step: "업로드 완료 (트랜스코딩 진행 중)", percent: 100 });
+        setAutoPublished(false);
+      }
       setPageStep("done");
     } catch (err: any) {
       console.error("업로드 실패:", err);
@@ -248,17 +286,17 @@ const StudioPage: React.FC = () => {
       videoFile: null,
       thumbnailFile: null,
     });
-    setSelectedTags([]);
     setSelectedParent(null);
     setSearchKeyword("");
     setSearchResults([]);
     setHasSearched(false);
-    setPageStep("select-parent");
+    setPageStep("dashboard");
     setProgress({ step: "", percent: 0 });
     setErrorMsg("");
+    setAutoPublished(false);
   };
 
-  // ── 업로드 진행 / 완료 / 에러 화면 ──
+  // ── 업로드 진행 화면 ──
   if (pageStep === "uploading") {
     return (
       <div className="min-h-screen bg-dark">
@@ -280,6 +318,7 @@ const StudioPage: React.FC = () => {
     );
   }
 
+  // ── 완료 화면 ──
   if (pageStep === "done") {
     return (
       <div className="min-h-screen bg-dark">
@@ -288,11 +327,13 @@ const StudioPage: React.FC = () => {
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-6" />
             <h2 className="text-xl font-bold mb-2">업로드 완료</h2>
             <p className="text-gray-400 mb-8">
-              트랜스코딩이 완료되면 크리에이터 피드에 노출됩니다.
+              {autoPublished
+                ? "콘텐츠가 공개되었습니다. 크리에이터 피드에서 확인하세요."
+                : "트랜스코딩이 진행 중입니다. 완료 후 자동으로 공개됩니다."}
             </p>
             <div className="flex gap-3 justify-center">
               <button onClick={resetForm} className="btn-primary">
-                새 영상 업로드
+                스튜디오로 돌아가기
               </button>
               <button
                 onClick={() => navigate("/creator")}
@@ -307,6 +348,7 @@ const StudioPage: React.FC = () => {
     );
   }
 
+  // ── 에러 화면 ──
   if (pageStep === "error") {
     return (
       <div className="min-h-screen bg-dark">
@@ -324,14 +366,100 @@ const StudioPage: React.FC = () => {
     );
   }
 
-  // ── 1단계: 원본 콘텐츠 검색/선택 ──
+  // ── 대시보드 (첫 화면): 내 콘텐츠 + 업로드 버튼 ──
+  if (pageStep === "dashboard") {
+    return (
+      <div className="min-h-screen bg-dark">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">스튜디오</h1>
+                <p className="text-gray-400">나만의 콘텐츠를 관리하세요</p>
+              </div>
+              <button
+                onClick={() => setPageStep("select-parent")}
+                className="btn-primary flex items-center gap-2 px-5 py-2.5"
+              >
+                <Plus className="w-5 h-5" />
+                콘텐츠 업로드
+              </button>
+            </div>
+
+            {/* 내 콘텐츠 */}
+            <h2 className="text-xl font-bold mb-4">내 콘텐츠</h2>
+            {myUploadsLoading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : myUploads.length === 0 ? (
+              <div className="text-center py-20 text-gray-500 bg-gray-900 rounded-lg">
+                <Video className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                <p className="mb-4">
+                  {myUploadsError
+                    ? "내 콘텐츠를 불러올 수 없습니다."
+                    : "아직 업로드한 콘텐츠가 없습니다."}
+                </p>
+                <button
+                  onClick={() => setPageStep("select-parent")}
+                  className="btn-primary px-6 py-2"
+                >
+                  첫 영상 업로드하기
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {myUploads.map((item) => (
+                  <div
+                    key={item.userContentId}
+                    className="bg-gray-900 rounded-lg overflow-hidden"
+                  >
+                    <div className="aspect-video bg-gray-800 relative overflow-hidden">
+                      {item.thumbnailUrl ? (
+                        <img
+                          src={item.thumbnailUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Video className="w-8 h-8 text-gray-600" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-medium line-clamp-2 mb-1">
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        조회수 {(item.totalViewCount ?? 0).toLocaleString()}회
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 원본 콘텐츠 검색/선택 ──
   if (pageStep === "select-parent") {
     return (
       <div className="min-h-screen bg-dark">
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-4xl mx-auto">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-2">스튜디오</h1>
+              <button
+                onClick={() => setPageStep("dashboard")}
+                className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-4"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                스튜디오로 돌아가기
+              </button>
+              <h1 className="text-3xl font-bold mb-2">원본 콘텐츠 선택</h1>
               <p className="text-gray-400">
                 2차 창작할 원본 콘텐츠를 검색하세요
               </p>
@@ -359,7 +487,6 @@ const StudioPage: React.FC = () => {
                 </button>
               </div>
 
-              {/* 자동완성 드롭다운 */}
               {showSuggestions && suggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-16 mt-1 bg-gray-900 border border-gray-700 rounded-lg overflow-hidden z-50">
                   {suggestions.map((s, i) => (
@@ -425,58 +552,12 @@ const StudioPage: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* 내 콘텐츠 */}
-          <div className="mt-12">
-            <h2 className="text-xl font-bold mb-4">내 콘텐츠</h2>
-            {myUploadsLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              </div>
-            ) : myUploads.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 bg-gray-900 rounded-lg">
-                <Video className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-                <p>업로드한 콘텐츠가 없습니다.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {myUploads.map((item) => (
-                  <div
-                    key={item.userContentId}
-                    className="bg-gray-900 rounded-lg overflow-hidden"
-                  >
-                    <div className="aspect-video bg-gray-800 relative overflow-hidden">
-                      {item.thumbnailUrl ? (
-                        <img
-                          src={item.thumbnailUrl}
-                          alt={item.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Video className="w-8 h-8 text-gray-600" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <p className="text-sm font-medium line-clamp-2 mb-1">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        조회수 {(item.totalViewCount ?? 0).toLocaleString()}회
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     );
   }
 
-  // ── 2단계: 업로드 폼 ──
+  // ── 업로드 폼 ──
   return (
     <div className="min-h-screen bg-dark">
       <div className="container mx-auto px-4 py-8">
@@ -489,7 +570,7 @@ const StudioPage: React.FC = () => {
               <ArrowLeft className="w-4 h-4" />
               원본 콘텐츠 다시 선택
             </button>
-            <h1 className="text-3xl font-bold mb-2">스튜디오</h1>
+            <h1 className="text-3xl font-bold mb-2">영상 업로드</h1>
             <p className="text-gray-400">
               나만의 콘텐츠를 업로드하고 공유하세요
             </p>
@@ -619,29 +700,6 @@ const StudioPage: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-3">
-                  <Tag className="w-4 h-4 inline mr-1" />
-                  태그 선택 (선택)
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {SYSTEM_TAGS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => handleTagToggle(tag)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                        selectedTags.includes(tag)
-                          ? "bg-primary text-white"
-                          : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               <div className="bg-gray-800 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">업로드 가이드</h3>
                 <ul className="text-sm text-gray-400 space-y-1">
@@ -660,7 +718,7 @@ const StudioPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate("/")}
+                  onClick={() => setPageStep("dashboard")}
                   className="btn-secondary"
                 >
                   취소

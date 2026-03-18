@@ -54,6 +54,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showControls, setShowControls] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"speed" | "quality">("speed");
+
+  // HLS 인스턴스 & 화질 레벨
+  const hlsRef = useRef<Hls | null>(null);
+  const [qualityLevels, setQualityLevels] = useState<
+    { index: number; height: number; bitrate: number }[]
+  >([]);
+  const [currentQuality, setCurrentQuality] = useState(-1); // -1 = 자동
 
   // 누적 재생 시간 추적 (실제로 재생된 시간)
   const playDurationRef = useRef(0);
@@ -75,10 +83,20 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           xhr.withCredentials = true; // 쿠키 포함
         },
       });
+      hlsRef.current = hls;
       hls.loadSource(videoUrl);
       hls.attachMedia(video);
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+        // 화질 레벨 수집
+        const levels = data.levels.map((level, index) => ({
+          index,
+          height: level.height,
+          bitrate: level.bitrate,
+        }));
+        setQualityLevels(levels);
+        setCurrentQuality(-1); // 자동
+
         if (startTime > 0) {
           video.currentTime = startTime;
         }
@@ -90,6 +108,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       });
 
       return () => {
+        hlsRef.current = null;
         hls.destroy();
       };
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -187,6 +206,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!video || !canUseSpeedControl) return;
     video.playbackRate = rate;
     setPlaybackRate(rate);
+    setShowSettings(false);
+  };
+
+  const changeQuality = (levelIndex: number) => {
+    const hls = hlsRef.current;
+    if (!hls) return;
+    hls.currentLevel = levelIndex; // -1 = 자동
+    setCurrentQuality(levelIndex);
     setShowSettings(false);
   };
 
@@ -341,26 +368,66 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <div className="relative flex items-center">
                   <button
                     onClick={() => setShowSettings(!showSettings)}
-                    className={`hover:text-primary transition-colors ${!canUseSpeedControl ? "opacity-50 cursor-not-allowed" : ""}`}
-                    disabled={!canUseSpeedControl}
+                    className="hover:text-primary transition-colors"
                   >
                     <Settings className="w-5 h-5" />
                   </button>
 
-                  {showSettings && canUseSpeedControl && (
-                    <div className="absolute bottom-full right-0 mb-2 bg-gray-900 rounded-lg p-2 min-w-[120px]">
-                      <div className="text-xs text-gray-400 mb-2">
-                        재생 속도
-                      </div>
-                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                  {showSettings && (
+                    <div className="absolute bottom-full right-0 mb-2 bg-gray-900 rounded-lg p-2 min-w-[160px]">
+                      {/* 탭 */}
+                      <div className="flex border-b border-gray-700 mb-2">
                         <button
-                          key={rate}
-                          onClick={() => changePlaybackRate(rate)}
-                          className={`block w-full text-left px-3 py-2 rounded hover:bg-gray-800 transition-colors ${playbackRate === rate ? "text-primary" : ""}`}
+                          onClick={() => setSettingsTab("quality")}
+                          className={`flex-1 text-xs py-1.5 transition-colors ${settingsTab === "quality" ? "text-primary border-b border-primary" : "text-gray-400"}`}
                         >
-                          {rate}x
+                          화질
                         </button>
-                      ))}
+                        <button
+                          onClick={() => setSettingsTab("speed")}
+                          className={`flex-1 text-xs py-1.5 transition-colors ${settingsTab === "speed" ? "text-primary border-b border-primary" : "text-gray-400"} ${!canUseSpeedControl ? "opacity-50" : ""}`}
+                          disabled={!canUseSpeedControl}
+                        >
+                          속도
+                        </button>
+                      </div>
+
+                      {settingsTab === "quality" && (
+                        <>
+                          <button
+                            onClick={() => changeQuality(-1)}
+                            className={`block w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors ${currentQuality === -1 ? "text-primary" : ""}`}
+                          >
+                            자동
+                          </button>
+                          {qualityLevels
+                            .slice()
+                            .sort((a, b) => b.height - a.height)
+                            .map((level) => (
+                              <button
+                                key={level.index}
+                                onClick={() => changeQuality(level.index)}
+                                className={`block w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors ${currentQuality === level.index ? "text-primary" : ""}`}
+                              >
+                                {level.height}p
+                              </button>
+                            ))}
+                        </>
+                      )}
+
+                      {settingsTab === "speed" && canUseSpeedControl && (
+                        <>
+                          {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+                            <button
+                              key={rate}
+                              onClick={() => changePlaybackRate(rate)}
+                              className={`block w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-800 transition-colors ${playbackRate === rate ? "text-primary" : ""}`}
+                            >
+                              {rate}x
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

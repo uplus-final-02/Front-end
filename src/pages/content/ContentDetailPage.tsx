@@ -305,6 +305,9 @@ const ContentDetailPage: React.FC = () => {
   };
 
   const handleEpisodeSelect = async (episode: Episode) => {
+    // 같은 에피소드 클릭 시 무시
+    if (currentVideoId === episode.id) return;
+
     cancelAutoplay();
     // 에피소드 전환 전 현재 위치 저장
     if (currentVideoIdRef.current && user) {

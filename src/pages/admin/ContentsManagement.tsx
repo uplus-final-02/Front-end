@@ -30,6 +30,7 @@ const ContentsManagement: React.FC<{
   const [totalElements, setTotalElements] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
   const [sortType, setSortType] = useState("LATEST");
+  const [appliedKeyword, setAppliedKeyword] = useState("");
 
   const [selectedContent, setSelectedContent] =
     useState<AdminContentDetail | null>(null);
@@ -510,7 +511,10 @@ const ContentsManagement: React.FC<{
             type="text"
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            placeholder="콘텐츠 제목으로 검색..."
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setAppliedKeyword(searchKeyword);
+            }}
+            placeholder="콘텐츠 제목으로 검색 (Enter)"
             className="w-full bg-gray-800 border border-gray-700 rounded pl-10 pr-4 py-2 text-white focus:outline-none focus:border-primary transition-colors"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -585,50 +589,58 @@ const ContentsManagement: React.FC<{
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {contents.map((c) => (
-                <tr
-                  key={c.contentId}
-                  className="hover:bg-gray-800/50 transition-colors"
-                >
-                  <td className="px-4 py-3 text-sm">{c.contentId}</td>
-                  <td className="px-4 py-3 text-sm font-medium max-w-[300px] truncate">
-                    {c.title}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <span className="px-2 py-1 bg-gray-800 rounded text-xs">
-                      {c.type === "SINGLE" ? "단일" : "시리즈"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {formatStatus(c.status)}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleViewDetail(c.contentId)}
-                        className="p-1 hover:text-blue-400 transition-colors"
-                        title="상세"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleOpenEdit(c.contentId)}
-                        className="p-1 hover:text-yellow-400 transition-colors"
-                        title="수정"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(c.contentId)}
-                        className="p-1 hover:text-red-500 transition-colors"
-                        title="삭제"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {contents
+                .filter(
+                  (c) =>
+                    !appliedKeyword.trim() ||
+                    c.title
+                      .toLowerCase()
+                      .includes(appliedKeyword.trim().toLowerCase()),
+                )
+                .map((c) => (
+                  <tr
+                    key={c.contentId}
+                    className="hover:bg-gray-800/50 transition-colors"
+                  >
+                    <td className="px-4 py-3 text-sm">{c.contentId}</td>
+                    <td className="px-4 py-3 text-sm font-medium max-w-[300px] truncate">
+                      {c.title}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className="px-2 py-1 bg-gray-800 rounded text-xs">
+                        {c.type === "SINGLE" ? "단일" : "시리즈"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {formatStatus(c.status)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewDetail(c.contentId)}
+                          className="p-1 hover:text-blue-400 transition-colors"
+                          title="상세"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(c.contentId)}
+                          className="p-1 hover:text-yellow-400 transition-colors"
+                          title="수정"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(c.contentId)}
+                          className="p-1 hover:text-red-500 transition-colors"
+                          title="삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -785,7 +797,7 @@ const ContentsManagement: React.FC<{
                     {selectedContent?.status === "HIDDEN" &&
                       editForm.status === "ACTIVE" && (
                         <p className="text-yellow-400 text-xs mt-1">
-                          ⚠ 트랜스코딩이 완료되었는지 확인 후 활성화해주세요.
+                          ⚠ 트랜스코딩이 완료된 후 활성화해주세요.
                         </p>
                       )}
                   </div>
@@ -1017,11 +1029,11 @@ const ContentsManagement: React.FC<{
                 {selectedContent.status === "HIDDEN" && (
                   <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                     <p className="text-yellow-400 text-sm font-semibold mb-1">
-                      ⏳ 트랜스코딩 대기 / 진행 중
+                      ⏳ 트랜스코딩 진행 중
                     </p>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      영상 트랜스코딩이 완료되지 않았을 수 있습니다. 트랜스코딩
-                      완료 후 수정 버튼을 눌러 상태를 "활성"으로 변경해주세요.
+                      트랜스코딩 완료 후 수정 버튼을 눌러 상태를 "활성"으로
+                      변경해주세요.
                     </p>
                   </div>
                 )}

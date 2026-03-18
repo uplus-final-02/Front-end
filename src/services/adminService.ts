@@ -283,7 +283,7 @@ export const adminService = {
   },
 
   async getSnapshotBuckets(
-    params: AdminSnapshotBucketListParams
+    params: AdminSnapshotBucketListParams,
   ): Promise<AdminSnapshotBucketPageResponse> {
     const { data } = await apiClient.get("/admin/metrics/snapshots/buckets", {
       params,
@@ -292,7 +292,7 @@ export const adminService = {
   },
 
   async getTrendingTimeline(
-    params: AdminTrendingTimelineParams
+    params: AdminTrendingTimelineParams,
   ): Promise<AdminTrendingTimelineResponse> {
     const { data } = await apiClient.get("/admin/metrics/trending/timeline", {
       params,
@@ -301,7 +301,7 @@ export const adminService = {
   },
 
   async getTrendingDetail(
-    params: AdminTrendingDetailParams
+    params: AdminTrendingDetailParams,
   ): Promise<AdminTrendingDetailResponse> {
     const { data } = await apiClient.get("/admin/metrics/trending/detail", {
       params,
@@ -310,12 +310,11 @@ export const adminService = {
   },
 
   async getTrendingVerify(
-    params: AdminTrendingVerifyParams
+    params: AdminTrendingVerifyParams,
   ): Promise<AdminTrendingVerifyResponse> {
     const { data } = await apiClient.get("/admin/metrics/trending/verify", {
       params,
     });
     return data;
   },
-
 };

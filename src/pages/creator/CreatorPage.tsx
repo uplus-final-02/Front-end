@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import {
   MessageCircle,
   Share2,
-  Bookmark,
   Info,
   X,
   Send,
@@ -41,12 +40,6 @@ const formatDuration = (sec: number) => {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
-};
-
-const formatCount = (n: number) => {
-  if (n >= 10000) return `${(n / 10000).toFixed(1)}만`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}천`;
-  return n.toString();
 };
 
 const formatDate = (dateStr: string) => {
@@ -93,7 +86,6 @@ const CreatorPage: React.FC = () => {
 
   // ── 패널 / UI 상태 ──
   const [openPanel, setOpenPanel] = useState<PanelType>(null);
-  const [bookmarked, setBookmarked] = useState<Set<number>>(new Set());
 
   // ── 댓글 상태 ──
   const [comments, setComments] = useState<Comment[]>([]);
@@ -253,14 +245,6 @@ const CreatorPage: React.FC = () => {
   }, [currentIndex, feedItems.length, hasMore, feedLoading, loadFeed]);
 
   // ── 핸들러 ──
-  const toggleBookmark = (id: number) => {
-    setBookmarked((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
   const handleShare = () => {
     const url = currentItem
       ? `${window.location.origin}/creator/${currentItem.userContentId}`
@@ -394,26 +378,7 @@ const CreatorPage: React.FC = () => {
               </div>
               <span className="text-xs">댓글</span>
             </button>
-            <button
-              onClick={() =>
-                currentItem && toggleBookmark(currentItem.userContentId)
-              }
-              className="flex flex-col items-center gap-1 transition-colors"
-            >
-              <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center">
-                <Bookmark
-                  className={`w-6 h-6 ${currentItem && bookmarked.has(currentItem.userContentId) ? "fill-primary text-primary" : "text-white"}`}
-                />
-              </div>
-              <span className="text-xs">
-                {currentItem
-                  ? formatCount(
-                      currentItem.bookmarkCount +
-                        (bookmarked.has(currentItem.userContentId) ? 1 : 0),
-                    )
-                  : "0"}
-              </span>
-            </button>
+
             <button
               onClick={handleShare}
               className="flex flex-col items-center gap-1 text-white hover:text-gray-300 transition-colors"
@@ -554,15 +519,6 @@ const CreatorPage: React.FC = () => {
                       <span className="text-gray-400">조회수</span>
                       <span className="ml-auto">
                         {playInfo.viewCount.toLocaleString()}회
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <Bookmark className="w-4 h-4 text-gray-500" />
-                      <span className="text-gray-400">찜</span>
-                      <span className="ml-auto">
-                        {currentItem
-                          ? currentItem.bookmarkCount.toLocaleString()
-                          : 0}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">

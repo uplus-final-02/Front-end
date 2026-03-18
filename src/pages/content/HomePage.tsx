@@ -164,7 +164,6 @@ const HomePage: React.FC = () => {
     try {
       // 실시간 인기 차트 가져오기
       const trendingContents = await contentService.getTrendingContents(10);
-      console.log("인기 차트:", trendingContents);
       // 중복 콘텐츠 제거 (같은 id가 여러 번 올 수 있음)
       const uniqueTrending = trendingContents.filter(
         (item, index, self) =>
@@ -177,7 +176,6 @@ const HomePage: React.FC = () => {
         page: 0,
         size: 50, // 충분히 많이 가져오기
       });
-      console.log("전체 콘텐츠:", allContents);
 
       // 필터링 없이 전체 콘텐츠 중 15개만 오리지널 섹션에 표시
       setOriginalContents(allContents.slice(0, 15));

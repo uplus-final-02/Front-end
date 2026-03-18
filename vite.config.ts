@@ -24,7 +24,7 @@ export default defineConfig({
           });
         },
       },
-      "/admin": {
+      "/admin/": {
         target: "https://ureca-utopia.duckdns.org",
         changeOrigin: true,
         secure: false,

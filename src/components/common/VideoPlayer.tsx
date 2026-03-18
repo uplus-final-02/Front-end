@@ -116,7 +116,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         video.volume = volume;
         video.muted = isMuted;
         if (autoPlay) {
-          video.play();
+          video.play().catch(() => {});
         }
       });
 
@@ -132,7 +132,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.volume = volume;
       video.muted = isMuted;
       if (autoPlay) {
-        video.play();
+        video.play().catch(() => {});
       }
     }
   }, [videoUrl, startTime, autoPlay]);

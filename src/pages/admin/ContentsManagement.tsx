@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search,
   Upload,
@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { adminService } from "@/services/adminService";
 import { profileService } from "@/services/profileService";
+import {
+  subscribeAdminTranscode,
+  type SSESubscription,
+  type TranscodeResultEvent,
+} from "@/services/sseService";
 import type {
   AdminContent,
   AdminContentDetail,
@@ -84,6 +89,25 @@ const ContentsManagement: React.FC<{
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
 
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
+  const [transcodeStatus, setTranscodeStatus] = useState<
+    "idle" | "waiting" | "done" | "failed"
+  >("idle");
+  const [transcodeReason, setTranscodeReason] = useState("");
+
+  // 목록에서 트랜스코딩 진행 중인 콘텐츠의 실시간 상태 추적
+  // 업로드 직후 등록된 콘텐츠만 추적 (uploadedDraft 기반)
+  const listSseRefs = useRef<Map<number, SSESubscription>>(new Map());
+  const [transcodeProgress, setTranscodeProgress] = useState<
+    Map<number, "waiting" | "done" | "failed">
+  >(new Map());
+
+  // SSE 정리
+  useEffect(() => {
+    return () => {
+      listSseRefs.current.forEach((sub) => sub.close());
+      listSseRefs.current.clear();
+    };
+  }, []);
 
   const loadContents = useCallback(async () => {
     setLoading(true);
@@ -112,12 +136,54 @@ const ContentsManagement: React.FC<{
       .catch(console.error);
   }, []);
 
+  // HIDDEN 콘텐츠에 SSE 구독 시작 (트랜스코딩 완료 감지)
+  const startTranscodeWatch = (contentId: number) => {
+    if (listSseRefs.current.has(contentId)) return; // 이미 구독 중
+    setTranscodeProgress((prev) => {
+      const next = new Map(prev);
+      next.set(contentId, "waiting");
+      return next;
+    });
+    const sub = subscribeAdminTranscode(
+      contentId,
+      (event: TranscodeResultEvent) => {
+        listSseRefs.current.get(contentId)?.close();
+        listSseRefs.current.delete(contentId);
+        if (event.transcodeStatus === "DONE") {
+          setTranscodeProgress((prev) => {
+            const next = new Map(prev);
+            next.set(contentId, "done");
+            return next;
+          });
+          // 가이드 권장: DONE 후 상세 재조회로 최신 상태 확정
+          adminService
+            .getContentDetail(contentId)
+            .then((detail) => setSelectedContent(detail))
+            .catch(() => {});
+          loadContents();
+        } else {
+          setTranscodeProgress((prev) => {
+            const next = new Map(prev);
+            next.set(contentId, "failed");
+            return next;
+          });
+        }
+      },
+      () => {},
+    );
+    listSseRefs.current.set(contentId, sub);
+  };
+
   const handleViewDetail = async (contentId: number) => {
     try {
       const detail = await adminService.getContentDetail(contentId);
       setSelectedContent(detail);
       setShowDetailModal(true);
       setEditMode(false);
+      // HIDDEN이면 SSE 구독으로 트랜스코딩 완료 감지
+      if (detail.status === "HIDDEN") {
+        startTranscodeWatch(contentId);
+      }
     } catch (error) {
       console.error("콘텐츠 상세 조회 실패:", error);
       alert("콘텐츠 상세 조회에 실패했습니다.");
@@ -161,6 +227,10 @@ const ContentsManagement: React.FC<{
       );
       setNewEpisodeFiles([]);
       setEditMode(true);
+      // HIDDEN이면 SSE 구독으로 트랜스코딩 완료 감지
+      if (detail.status === "HIDDEN") {
+        startTranscodeWatch(contentId);
+      }
     } catch (error) {
       console.error("콘텐츠 상세 조회 실패:", error);
       alert("콘텐츠 상세 조회에 실패했습니다.");
@@ -176,17 +246,20 @@ const ContentsManagement: React.FC<{
         actor: editForm.actor || "",
         release: editForm.releaseDate || "",
       });
-      await adminService.updateContentMetadata(selectedContent.contentId, {
-        title: editForm.title,
-        description: descriptionJson,
-        thumbnailUrl: selectedContent.thumbnailUrl,
-        accessLevel: editForm.accessLevel,
-        status: editForm.status,
-        tagIds:
-          editForm.tagIds && editForm.tagIds.length > 0
-            ? editForm.tagIds
-            : undefined,
-      });
+      const result = await adminService.updateContentMetadata(
+        selectedContent.contentId,
+        {
+          title: editForm.title,
+          description: descriptionJson,
+          thumbnailUrl: selectedContent.thumbnailUrl,
+          accessLevel: editForm.accessLevel,
+          status: editForm.status,
+          tagIds:
+            editForm.tagIds && editForm.tagIds.length > 0
+              ? editForm.tagIds
+              : undefined,
+        },
+      );
 
       // 기존 에피소드 제목/설명 업데이트
       if (selectedContent.type === "SERIES") {
@@ -258,7 +331,31 @@ const ContentsManagement: React.FC<{
         }
       }
 
-      alert("수정되었습니다.");
+      // 활성화 요청했는데 트랜스코딩 미완료로 HIDDEN 유지된 경우
+      const requestedActive = editForm.status === "ACTIVE";
+      const requestedHidden = editForm.status === "HIDDEN";
+      const actualStatus = result?.status;
+      console.log("[수정 응답]", result);
+
+      // 의도적으로 HIDDEN으로 내린 경우 — 트랜스코딩 추적 제거
+      if (requestedHidden) {
+        listSseRefs.current.get(selectedContent.contentId)?.close();
+        listSseRefs.current.delete(selectedContent.contentId);
+        setTranscodeProgress((prev) => {
+          const next = new Map(prev);
+          next.delete(selectedContent.contentId);
+          return next;
+        });
+        alert("수정되었습니다.");
+      } else if (requestedActive && actualStatus && actualStatus !== "ACTIVE") {
+        // 트랜스코딩 완료 대기를 위해 SSE 구독 시작
+        startTranscodeWatch(selectedContent.contentId);
+        alert(
+          `트랜스코딩이 아직 완료되지 않아 활성화할 수 없습니다.\nSSE로 트랜스코딩 완료를 감지 중입니다.\n완료되면 목록이 자동 갱신됩니다.`,
+        );
+      } else {
+        alert("수정되었습니다.");
+      }
       setShowDetailModal(false);
       loadContents();
     } catch (error: any) {
@@ -444,11 +541,45 @@ const ContentsManagement: React.FC<{
         }
       }
       setUploadStep("done");
-      setTimeout(() => {
-        setShowUploadModal(false);
-        resetUpload();
-        loadContents();
-      }, 1500);
+      // SSE 구독 시작 — 트랜스코딩 완료 시 자동 갱신 (모달과 독립적으로 유지)
+      setTranscodeStatus("waiting");
+      const cid = uploadedDraft.contentId;
+      setTranscodeProgress((prev) => {
+        const next = new Map(prev);
+        next.set(cid, "waiting");
+        return next;
+      });
+      // 기존 구독 정리 후 listSseRefs에 등록 (모달 닫아도 유지됨)
+      listSseRefs.current.get(cid)?.close();
+      const sub = subscribeAdminTranscode(
+        cid,
+        (event: TranscodeResultEvent) => {
+          listSseRefs.current.get(cid)?.close();
+          listSseRefs.current.delete(cid);
+          if (event.transcodeStatus === "DONE") {
+            setTranscodeStatus("done");
+            setTranscodeProgress((prev) => {
+              const next = new Map(prev);
+              next.set(cid, "done");
+              return next;
+            });
+            // 가이드 권장: DONE 후 상세 조회로 최신 상태 확정
+            loadContents();
+          } else {
+            setTranscodeStatus("failed");
+            setTranscodeReason(event.reason || "트랜스코딩 실패");
+            setTranscodeProgress((prev) => {
+              const next = new Map(prev);
+              next.set(cid, "failed");
+              return next;
+            });
+          }
+        },
+        () => {
+          // SSE 연결 실패 시 무시
+        },
+      );
+      listSseRefs.current.set(cid, sub);
     } catch (error) {
       console.error("메타데이터 저장 실패:", error);
       alert("메타데이터 저장에 실패했습니다.");
@@ -475,15 +606,62 @@ const ContentsManagement: React.FC<{
       accessLevel: "FREE",
     });
     setSelectedTagIds([]);
+    setTranscodeStatus("idle");
+    setTranscodeReason("");
   };
 
-  const formatStatus = (status: string) => {
+  const formatStatus = (status: string, contentId?: number) => {
+    // HIDDEN 상태일 때 트랜스코딩 실시간 상태 확인
+    if (status === "HIDDEN" && contentId) {
+      const liveStatus = transcodeProgress.get(contentId);
+
+      if (liveStatus === "done") {
+        return (
+          <span
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 w-fit"
+            style={{
+              backgroundColor: "rgba(34,197,94,0.2)",
+              color: "#4ade80",
+            }}
+          >
+            <Check className="w-3 h-3" /> 트랜스코딩 완료
+          </span>
+        );
+      }
+      if (liveStatus === "failed") {
+        return (
+          <span
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 w-fit"
+            style={{
+              backgroundColor: "rgba(239,68,68,0.2)",
+              color: "#f87171",
+            }}
+          >
+            <AlertCircle className="w-3 h-3" /> 트랜스코딩 실패
+          </span>
+        );
+      }
+      if (liveStatus === "waiting") {
+        return (
+          <span
+            className="px-2 py-1 rounded text-xs flex items-center gap-1 w-fit"
+            style={{
+              backgroundColor: "rgba(234,179,8,0.25)",
+              color: "#fde047",
+            }}
+          >
+            <Loader2 className="w-3 h-3 animate-spin" /> 트랜스코딩 중
+          </span>
+        );
+      }
+    }
+
     const map: Record<string, { label: string; bg: string; text: string }> = {
       ACTIVE: { label: "활성", bg: "rgba(34,197,94,0.2)", text: "#4ade80" },
       HIDDEN: {
-        label: "숨김 (트랜스코딩 대기)",
-        bg: "rgba(234,179,8,0.25)",
-        text: "#fde047",
+        label: "숨김",
+        bg: "rgba(107,114,128,0.2)",
+        text: "#9ca3af",
       },
       DELETED: { label: "삭제됨", bg: "rgba(239,68,68,0.2)", text: "#f87171" },
     };
@@ -612,7 +790,7 @@ const ContentsManagement: React.FC<{
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      {formatStatus(c.status)}
+                      {formatStatus(c.status, c.contentId)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <div className="flex gap-2">
@@ -794,12 +972,6 @@ const ContentsManagement: React.FC<{
                       <option value="ACTIVE">활성</option>
                       <option value="HIDDEN">숨김</option>
                     </select>
-                    {selectedContent?.status === "HIDDEN" &&
-                      editForm.status === "ACTIVE" && (
-                        <p className="text-yellow-400 text-xs mt-1">
-                          ⚠ 트랜스코딩이 완료된 후 활성화해주세요.
-                        </p>
-                      )}
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -1025,18 +1197,50 @@ const ContentsManagement: React.FC<{
               </div>
             ) : (
               <div className="space-y-4">
-                {/* 트랜스코딩 대기 안내 */}
-                {selectedContent.status === "HIDDEN" && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                    <p className="text-yellow-400 text-sm font-semibold mb-1">
-                      ⏳ 트랜스코딩 진행 중
-                    </p>
-                    <p className="text-gray-400 text-xs leading-relaxed">
-                      트랜스코딩 완료 후 수정 버튼을 눌러 상태를 "활성"으로
-                      변경해주세요.
-                    </p>
-                  </div>
-                )}
+                {/* 상태 안내 */}
+                {selectedContent.status === "HIDDEN" &&
+                  (() => {
+                    const liveStatus = transcodeProgress.get(
+                      selectedContent.contentId,
+                    );
+                    if (liveStatus === "done") {
+                      return (
+                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                          <p className="text-green-400 text-sm font-semibold mb-1">
+                            ✅ 트랜스코딩 완료
+                          </p>
+                          <p className="text-gray-400 text-xs leading-relaxed">
+                            수정 버튼을 눌러 상태를 "활성"으로 변경하면
+                            사용자에게 공개됩니다.
+                          </p>
+                        </div>
+                      );
+                    }
+                    if (liveStatus === "failed") {
+                      return (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                          <p className="text-red-400 text-sm font-semibold mb-1">
+                            ❌ 트랜스코딩 실패
+                          </p>
+                          <p className="text-gray-400 text-xs leading-relaxed">
+                            영상 파일에 문제가 있을 수 있습니다. 콘텐츠를
+                            삭제하고 다시 업로드해주세요.
+                          </p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="bg-gray-500/10 border border-gray-500/30 rounded-lg p-4">
+                        <p className="text-gray-400 text-sm font-semibold mb-1">
+                          숨김 상태
+                        </p>
+                        <p className="text-gray-400 text-xs leading-relaxed">
+                          수정 버튼을 눌러 상태를 "활성"으로 변경할 수 있습니다.
+                          트랜스코딩이 완료되지 않았으면 활성화되지 않습니다.
+                        </p>
+                      </div>
+                    );
+                  })()}
                 <div className="flex gap-4">
                   {selectedContent.thumbnailUrl && (
                     <img
@@ -1053,7 +1257,10 @@ const ContentsManagement: React.FC<{
                       <span className="px-2 py-1 bg-gray-800 rounded text-xs">
                         {selectedContent.type === "SINGLE" ? "단일" : "시리즈"}
                       </span>
-                      {formatStatus(selectedContent.status)}
+                      {formatStatus(
+                        selectedContent.status,
+                        selectedContent.contentId,
+                      )}
                       <span
                         className={`px-2 py-1 rounded text-xs ${selectedContent.accessLevel === "UPLUS" ? "bg-primary/20 text-primary" : "bg-gray-500/20 text-gray-300"}`}
                       >
@@ -1353,14 +1560,6 @@ const ContentsManagement: React.FC<{
                   <Check className="w-4 h-4" /> 영상 업로드 완료. 메타데이터를
                   입력해주세요.
                 </p>
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3 mb-2">
-                  <p className="text-blue-400 text-xs leading-relaxed">
-                    💡 영상이 트랜스코딩 처리 중이므로 콘텐츠는{" "}
-                    <span className="text-yellow-300 font-semibold">숨김</span>{" "}
-                    상태로 등록됩니다. 트랜스코딩 완료 후 콘텐츠 목록에서 상태를
-                    활성으로 변경해주세요.
-                  </p>
-                </div>
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">
                     제목
@@ -1525,18 +1724,56 @@ const ContentsManagement: React.FC<{
                 <p className="text-green-400 font-semibold mb-2">
                   콘텐츠가 등록되었습니다.
                 </p>
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mt-4 text-left">
-                  <p className="text-yellow-400 text-sm font-semibold mb-2">
-                    ⏳ 트랜스코딩 진행 중
-                  </p>
-                  <p className="text-gray-400 text-xs leading-relaxed">
-                    영상이 트랜스코딩 처리 중이므로 콘텐츠가{" "}
-                    <span className="text-yellow-300">숨김</span> 상태로
-                    등록되었습니다. 트랜스코딩이 완료된 후 콘텐츠 목록에서
-                    상태를 <span className="text-green-400">활성</span>으로
-                    변경해주세요.
-                  </p>
-                </div>
+
+                {transcodeStatus === "waiting" && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mt-4 text-left">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-yellow-400" />
+                      <p className="text-yellow-400 text-sm font-semibold">
+                        트랜스코딩 진행 중...
+                      </p>
+                    </div>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      실시간으로 트랜스코딩 상태를 감지하고 있습니다. 완료되면
+                      자동으로 콘텐츠 목록이 갱신됩니다.
+                    </p>
+                  </div>
+                )}
+
+                {transcodeStatus === "done" && (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mt-4 text-left">
+                    <p className="text-green-400 text-sm font-semibold mb-1">
+                      ✅ 트랜스코딩 완료
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      콘텐츠 목록에서 상태를{" "}
+                      <span className="text-green-400">활성</span>으로 변경하면
+                      사용자에게 공개됩니다.
+                    </p>
+                  </div>
+                )}
+
+                {transcodeStatus === "failed" && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mt-4 text-left">
+                    <p className="text-red-400 text-sm font-semibold mb-1">
+                      ❌ 트랜스코딩 실패
+                    </p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      {transcodeReason || "알 수 없는 오류가 발생했습니다."}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setShowUploadModal(false);
+                    resetUpload();
+                    loadContents();
+                  }}
+                  className="btn-primary px-6 py-2 mt-4"
+                >
+                  닫기
+                </button>
               </div>
             )}
 

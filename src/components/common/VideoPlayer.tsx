@@ -68,8 +68,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const playingRef = useRef(false);
 
   // 구독 여부에 따른 제한
-  const canUseSpeedControl = user?.subscriptionType !== "none";
-  const isFreeUser = user?.subscriptionType === "none";
+  const canUseSpeedControl =
+    user?.subscriptionType !== "none" || user?.isLGUPlus;
+  const isFreeUser = user?.subscriptionType === "none" && !user?.isLGUPlus;
   const MAX_FREE_HEIGHT = 720;
 
   useEffect(() => {
@@ -100,7 +101,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         setCurrentQuality(-1); // 자동
 
         // free 유저는 720p 이하로 자동 화질 제한
-        if (user?.subscriptionType === "none") {
+        if (user?.subscriptionType === "none" && !user?.isLGUPlus) {
           const maxIndex = levels
             .filter((l) => l.height <= 720)
             .sort((a, b) => b.height - a.height)[0]?.index;

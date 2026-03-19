@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   MessageCircle,
   Share2,
@@ -74,6 +74,7 @@ type PanelType = "comments" | "info" | null;
 const CreatorPage: React.FC = () => {
   const { videoId: paramVideoId } = useParams<{ videoId?: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   // ── 피드 상태 ──
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
@@ -372,6 +373,23 @@ const CreatorPage: React.FC = () => {
     );
   }
   if (feedItems.length === 0 && !directPlayInfo && !directLoading) {
+    if (!user) {
+      return (
+        <div className="fixed inset-0 top-16 flex items-center justify-center bg-dark">
+          <div className="text-center">
+            <p className="text-gray-400 mb-4">
+              크리에이터 콘텐츠를 보려면 로그인이 필요합니다.
+            </p>
+            <button
+              onClick={() => navigate("/login")}
+              className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/80 transition-colors"
+            >
+              로그인
+            </button>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="fixed inset-0 top-16 flex items-center justify-center bg-dark">
         <p className="text-gray-400">아직 크리에이터 콘텐츠가 없습니다.</p>

@@ -11,17 +11,62 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [failCount, setFailCount] = useState(0);
+  const [locked, setLocked] = useState(false);
+  const [lockTimer, setLockTimer] = useState(0);
+
+  // 잠금 타이머
+  React.useEffect(() => {
+    if (!locked || lockTimer <= 0) return;
+    const interval = setInterval(() => {
+      setLockTimer((prev) => {
+        if (prev <= 1) {
+          setLocked(false);
+          setFailCount(0);
+          setError("");
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [locked, lockTimer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (locked) return;
     setError("");
     setLoading(true);
 
     try {
       await login(email, password);
+      setFailCount(0);
       navigate("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "로그인에 실패했습니다.");
+    } catch (err: any) {
+      const msg = err instanceof Error ? err.message : "로그인에 실패했습니다.";
+
+      // 429 = 계정 잠금
+      if (msg.includes("시도 횟수를 초과") || msg.includes("분 후")) {
+        setLocked(true);
+        setLockTimer(15 * 60); // 15분
+        setFailCount(5);
+        setError(msg);
+      } else if (msg.includes("이메일 또는 비밀번호")) {
+        const newCount = failCount + 1;
+        setFailCount(newCount);
+        if (newCount >= 5) {
+          setLocked(true);
+          setLockTimer(15 * 60);
+          setError(
+            "로그인 시도 횟수를 초과했습니다. 15분 후 다시 시도해주세요.",
+          );
+        } else {
+          setError(`이메일 또는 비밀번호가 올바르지 않습니다. (${newCount}/5)`);
+        }
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -86,17 +131,28 @@ const LoginPage: React.FC = () => {
             </div>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+              <div
+                className={`px-4 py-3 rounded text-sm ${
+                  locked
+                    ? "bg-yellow-500/10 border border-yellow-500 text-yellow-400"
+                    : "bg-red-500/10 border border-red-500 text-red-500"
+                }`}
+              >
                 {error}
+                {locked && lockTimer > 0 && (
+                  <p className="mt-1 text-xs">
+                    남은 시간: {Math.floor(lockTimer / 60)}분 {lockTimer % 60}초
+                  </p>
+                )}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || locked}
               className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "로그인 중..." : "로그인"}
+              {locked ? "계정 잠금 중" : loading ? "로그인 중..." : "로그인"}
             </button>
           </form>
 

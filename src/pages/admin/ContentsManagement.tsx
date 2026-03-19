@@ -159,7 +159,10 @@ const ContentsManagement: React.FC<{
               thumbnailUrl: detail.thumbnailUrl || "",
               accessLevel: detail.accessLevel,
               status: "ACTIVE",
-              tagIds: detail.tags.map((t) => t.tagId),
+              tagIds:
+                detail.tags.length > 0
+                  ? detail.tags.map((t) => t.tagId)
+                  : undefined,
             });
           } catch (e) {
             console.warn("자동 활성화 실패:", e);
@@ -556,6 +559,8 @@ const ContentsManagement: React.FC<{
         }
       }
       setUploadStep("done");
+      // 목록 즉시 갱신 — 새 콘텐츠가 목록에 바로 보이도록
+      loadContents();
       // SSE 구독 시작 — 트랜스코딩 완료 시 자동 갱신 (모달과 독립적으로 유지)
       setTranscodeStatus("waiting");
       const cid = uploadedDraft.contentId;
@@ -581,7 +586,10 @@ const ContentsManagement: React.FC<{
                 thumbnailUrl: detail.thumbnailUrl || thumbnailUrl,
                 accessLevel: detail.accessLevel,
                 status: "ACTIVE",
-                tagIds: detail.tags.map((t) => t.tagId),
+                tagIds:
+                  detail.tags.length > 0
+                    ? detail.tags.map((t) => t.tagId)
+                    : undefined,
               });
             } catch (e) {
               console.warn("자동 활성화 실패:", e);
@@ -614,6 +622,7 @@ const ContentsManagement: React.FC<{
         try {
           const detail = await adminService.getContentDetail(cid);
           if (detail.status === "ACTIVE") {
+            // 이미 활성화됨 (백엔드 자동 전환 또는 SSE 콜백 성공)
             clearInterval(pollInterval);
             setTranscodeStatus("done");
             setTranscodeProgress((prev) => {
@@ -624,6 +633,36 @@ const ContentsManagement: React.FC<{
             listSseRefs.current.get(cid)?.close();
             listSseRefs.current.delete(cid);
             loadContents();
+          } else if (detail.status === "HIDDEN") {
+            // 아직 HIDDEN → ACTIVE 전환 시도 (트랜스코딩 완료됐으면 백엔드가 활성화해줌)
+            try {
+              await adminService.updateContentMetadata(cid, {
+                title: detail.title,
+                description: detail.description,
+                thumbnailUrl: detail.thumbnailUrl || "",
+                accessLevel: detail.accessLevel,
+                status: "ACTIVE",
+                tagIds:
+                  detail.tags.length > 0
+                    ? detail.tags.map((t) => t.tagId)
+                    : undefined,
+              });
+              const refreshed = await adminService.getContentDetail(cid);
+              if (refreshed.status === "ACTIVE") {
+                clearInterval(pollInterval);
+                setTranscodeStatus("done");
+                setTranscodeProgress((prev) => {
+                  const next = new Map(prev);
+                  next.set(cid, "done");
+                  return next;
+                });
+                listSseRefs.current.get(cid)?.close();
+                listSseRefs.current.delete(cid);
+                loadContents();
+              }
+            } catch {
+              // 활성화 실패 (트랜스코딩 미완료) → 다음 폴링에서 재시도
+            }
           }
         } catch {
           // 폴링 실패 무시

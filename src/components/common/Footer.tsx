@@ -40,7 +40,7 @@ const Footer: React.FC = () => {
 
         {/* 하단: 저작권 */}
         <div className="text-center text-[11px] text-gray-600 pt-3">
-          <p>© 2025 UTOPIA. All rights reserved.</p>
+          <p>© 2026 UTOPIA. All rights reserved.</p>
         </div>
       </div>
     </footer>

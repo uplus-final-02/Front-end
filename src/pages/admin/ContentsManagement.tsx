@@ -146,20 +146,38 @@ const ContentsManagement: React.FC<{
     });
     const sub = subscribeAdminTranscode(
       contentId,
-      (event: TranscodeResultEvent) => {
+      async (event: TranscodeResultEvent) => {
         listSseRefs.current.get(contentId)?.close();
         listSseRefs.current.delete(contentId);
         if (event.transcodeStatus === "DONE") {
+          // 트랜스코딩 완료 → 자동으로 ACTIVE 전환
+          try {
+            const detail = await adminService.getContentDetail(contentId);
+            await adminService.updateContentMetadata(contentId, {
+              title: detail.title,
+              description: detail.description,
+              thumbnailUrl: detail.thumbnailUrl || "",
+              accessLevel: detail.accessLevel,
+              status: "ACTIVE",
+              tagIds:
+                detail.tags.length > 0
+                  ? detail.tags.map((t) => t.tagId)
+                  : undefined,
+            });
+          } catch (e) {
+            console.warn("자동 활성화 실패:", e);
+          }
           setTranscodeProgress((prev) => {
             const next = new Map(prev);
             next.set(contentId, "done");
             return next;
           });
-          // 가이드 권장: DONE 후 상세 재조회로 최신 상태 확정
-          adminService
-            .getContentDetail(contentId)
-            .then((detail) => setSelectedContent(detail))
-            .catch(() => {});
+          if (selectedContent?.contentId === contentId) {
+            adminService
+              .getContentDetail(contentId)
+              .then((detail) => setSelectedContent(detail))
+              .catch(() => {});
+          }
           loadContents();
         } else {
           setTranscodeProgress((prev) => {
@@ -487,7 +505,7 @@ const ContentsManagement: React.FC<{
     if (!uploadedDraft) return;
     try {
       // 썸네일 업로드
-      let thumbnailUrl = "TEMP_THUMBNAIL_URL";
+      let thumbnailUrl = "";
       if (thumbnailFile) {
         const thumbResult = await adminService.uploadThumbnail(
           uploadedDraft.contentId,
@@ -541,6 +559,8 @@ const ContentsManagement: React.FC<{
         }
       }
       setUploadStep("done");
+      // 목록 즉시 갱신 — 새 콘텐츠가 목록에 바로 보이도록
+      loadContents();
       // SSE 구독 시작 — 트랜스코딩 완료 시 자동 갱신 (모달과 독립적으로 유지)
       setTranscodeStatus("waiting");
       const cid = uploadedDraft.contentId;
@@ -553,17 +573,33 @@ const ContentsManagement: React.FC<{
       listSseRefs.current.get(cid)?.close();
       const sub = subscribeAdminTranscode(
         cid,
-        (event: TranscodeResultEvent) => {
+        async (event: TranscodeResultEvent) => {
           listSseRefs.current.get(cid)?.close();
           listSseRefs.current.delete(cid);
           if (event.transcodeStatus === "DONE") {
+            // 트랜스코딩 완료 → 자동으로 ACTIVE 전환
+            try {
+              const detail = await adminService.getContentDetail(cid);
+              await adminService.updateContentMetadata(cid, {
+                title: detail.title,
+                description: detail.description,
+                thumbnailUrl: detail.thumbnailUrl || thumbnailUrl,
+                accessLevel: detail.accessLevel,
+                status: "ACTIVE",
+                tagIds:
+                  detail.tags.length > 0
+                    ? detail.tags.map((t) => t.tagId)
+                    : undefined,
+              });
+            } catch (e) {
+              console.warn("자동 활성화 실패:", e);
+            }
             setTranscodeStatus("done");
             setTranscodeProgress((prev) => {
               const next = new Map(prev);
               next.set(cid, "done");
               return next;
             });
-            // 가이드 권장: DONE 후 상세 조회로 최신 상태 확정
             loadContents();
           } else {
             setTranscodeStatus("failed");
@@ -580,6 +616,60 @@ const ContentsManagement: React.FC<{
         },
       );
       listSseRefs.current.set(cid, sub);
+
+      // SSE 폴백: 폴링으로 트랜스코딩 상태 확인 (SSE가 안 될 경우 대비)
+      const pollInterval = setInterval(async () => {
+        try {
+          const detail = await adminService.getContentDetail(cid);
+          if (detail.status === "ACTIVE") {
+            // 이미 활성화됨 (백엔드 자동 전환 또는 SSE 콜백 성공)
+            clearInterval(pollInterval);
+            setTranscodeStatus("done");
+            setTranscodeProgress((prev) => {
+              const next = new Map(prev);
+              next.set(cid, "done");
+              return next;
+            });
+            listSseRefs.current.get(cid)?.close();
+            listSseRefs.current.delete(cid);
+            loadContents();
+          } else if (detail.status === "HIDDEN") {
+            // 아직 HIDDEN → ACTIVE 전환 시도 (트랜스코딩 완료됐으면 백엔드가 활성화해줌)
+            try {
+              await adminService.updateContentMetadata(cid, {
+                title: detail.title,
+                description: detail.description,
+                thumbnailUrl: detail.thumbnailUrl || "",
+                accessLevel: detail.accessLevel,
+                status: "ACTIVE",
+                tagIds:
+                  detail.tags.length > 0
+                    ? detail.tags.map((t) => t.tagId)
+                    : undefined,
+              });
+              const refreshed = await adminService.getContentDetail(cid);
+              if (refreshed.status === "ACTIVE") {
+                clearInterval(pollInterval);
+                setTranscodeStatus("done");
+                setTranscodeProgress((prev) => {
+                  const next = new Map(prev);
+                  next.set(cid, "done");
+                  return next;
+                });
+                listSseRefs.current.get(cid)?.close();
+                listSseRefs.current.delete(cid);
+                loadContents();
+              }
+            } catch {
+              // 활성화 실패 (트랜스코딩 미완료) → 다음 폴링에서 재시도
+            }
+          }
+        } catch {
+          // 폴링 실패 무시
+        }
+      }, 5000);
+      // 5분 후 폴링 중단
+      setTimeout(() => clearInterval(pollInterval), 300000);
     } catch (error) {
       console.error("메타데이터 저장 실패:", error);
       alert("메타데이터 저장에 실패했습니다.");
@@ -1746,9 +1836,9 @@ const ContentsManagement: React.FC<{
                       ✅ 트랜스코딩 완료
                     </p>
                     <p className="text-gray-400 text-xs leading-relaxed">
-                      콘텐츠 목록에서 상태를{" "}
-                      <span className="text-green-400">활성</span>으로 변경하면
-                      사용자에게 공개됩니다.
+                      콘텐츠가 자동으로{" "}
+                      <span className="text-green-400">활성</span> 상태로
+                      전환되었습니다.
                     </p>
                   </div>
                 )}

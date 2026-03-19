@@ -58,6 +58,7 @@ function createSSEConnection(
   const connect = async () => {
     const token = localStorage.getItem("accessToken");
     try {
+      console.log("[SSE] 연결 시도:", url);
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -66,6 +67,12 @@ function createSSEConnection(
         },
         signal: controller.signal,
       });
+
+      console.log(
+        "[SSE] 응답 상태:",
+        response.status,
+        response.headers.get("content-type"),
+      );
 
       if (!response.ok || !response.body) {
         throw new Error(`SSE 연결 실패: ${response.status}`);
@@ -78,26 +85,32 @@ function createSSEConnection(
 
       while (!aborted) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log("[SSE] 스트림 종료");
+          break;
+        }
 
-        buffer += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
+        console.log("[SSE] 수신:", chunk);
+        buffer += chunk;
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
 
         for (const line of lines) {
           if (line.startsWith("event:")) {
             currentEvent = line.slice(6).trim();
-          } else if (
-            line.startsWith("data:") &&
-            currentEvent === "TRANSCODE_RESULT"
-          ) {
-            try {
-              const data = JSON.parse(
-                line.slice(5).trim(),
-              ) as TranscodeResultEvent;
-              onResult(data);
-            } catch (e) {
-              console.warn("SSE 데이터 파싱 실패:", e);
+          } else if (line.startsWith("data:")) {
+            const eventName = currentEvent;
+            if (eventName === "TRANSCODE_RESULT") {
+              try {
+                const data = JSON.parse(
+                  line.slice(5).trim(),
+                ) as TranscodeResultEvent;
+                console.log("[SSE] TRANSCODE_RESULT 이벤트:", data);
+                onResult(data);
+              } catch (e) {
+                console.warn("SSE 데이터 파싱 실패:", e);
+              }
             }
             currentEvent = "";
           } else if (line === "") {

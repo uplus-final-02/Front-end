@@ -2,12 +2,24 @@
 
 > LG U+ 고객 맞춤형 숏폼 OTT 플랫폼 — 1~5분 짧은 러닝타임 콘텐츠 스트리밍 서비스
 
+
 <img width="1918" height="948" alt="image" src="https://github.com/user-attachments/assets/91293ddf-92bf-4e94-a196-f31e3b01e6a6" />
+
+**기간**: 2025.02.04 ~ 2025.03.19
+
 
 
 ## 배포
 
 🔗 [https://utopiaott.vercel.app](https://utopiaott.vercel.app)
+
+## 팀 구성
+
+| 이혁준 |
+| :---: |
+| <img width="150" height="150" alt="image" src="https://github.com/user-attachments/assets/83a198ba-fe78-4962-b8e9-e3e7cf00d681" /> <br/>[@Lilium0422](https://github.com/Lilium0422)|
+| **FrontEnd** |
+| 프론트엔드 UI/UX 총괄 디자인 및 개발 |
 
 ## 프로젝트 소개
 

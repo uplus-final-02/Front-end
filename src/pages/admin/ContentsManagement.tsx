@@ -1279,11 +1279,31 @@ const ContentsManagement: React.FC<{
                   </button>
                   <button
                     onClick={handleEditSave}
-                    className="px-4 py-2 bg-primary rounded hover:bg-primary/80"
+                    disabled={
+                      !editForm.title?.trim() ||
+                      !editForm.description?.trim() ||
+                      !editForm.director?.trim() ||
+                      !editForm.actor?.trim() ||
+                      !editForm.releaseDate ||
+                      !editForm.tagIds ||
+                      editForm.tagIds.length === 0
+                    }
+                    className="px-4 py-2 bg-primary rounded hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     저장
                   </button>
                 </div>
+                {(!editForm.title?.trim() ||
+                  !editForm.description?.trim() ||
+                  !editForm.director?.trim() ||
+                  !editForm.actor?.trim() ||
+                  !editForm.releaseDate ||
+                  !editForm.tagIds ||
+                  editForm.tagIds.length === 0) && (
+                  <p className="text-xs text-red-400 text-center">
+                    모든 항목을 입력해주세요.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -1800,11 +1820,30 @@ const ContentsManagement: React.FC<{
                 </div>
                 <button
                   onClick={handleMetadataSave}
-                  disabled={!metadataForm.title.trim()}
+                  disabled={
+                    !metadataForm.title.trim() ||
+                    !metadataForm.description.trim() ||
+                    !metadataForm.director.trim() ||
+                    !metadataForm.actor.trim() ||
+                    !metadataForm.releaseDate ||
+                    !thumbnailFile ||
+                    selectedTagIds.length === 0
+                  }
                   className="w-full btn-primary py-2.5 disabled:opacity-50"
                 >
                   등록 완료
                 </button>
+                {(!metadataForm.title.trim() ||
+                  !metadataForm.description.trim() ||
+                  !metadataForm.director.trim() ||
+                  !metadataForm.actor.trim() ||
+                  !metadataForm.releaseDate ||
+                  !thumbnailFile ||
+                  selectedTagIds.length === 0) && (
+                  <p className="text-xs text-red-400 mt-2 text-center">
+                    모든 항목을 입력하고 썸네일을 업로드해주세요.
+                  </p>
+                )}
               </div>
             )}
 

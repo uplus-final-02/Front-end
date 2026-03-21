@@ -23,6 +23,7 @@ import type {
   AdminContentDetail,
   AdminContentUpdateRequest,
 } from "@/services/adminService";
+import AlertModal from "@/components/common/AlertModal";
 
 const ContentsManagement: React.FC<{
   searchKeyword: string;
@@ -93,6 +94,11 @@ const ContentsManagement: React.FC<{
     "idle" | "waiting" | "done" | "failed"
   >("idle");
   const [transcodeReason, setTranscodeReason] = useState("");
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+    onClose?: () => void;
+  } | null>(null);
 
   // 목록에서 트랜스코딩 진행 중인 콘텐츠의 실시간 상태 추적
   // 업로드 직후 등록된 콘텐츠만 추적 (uploadedDraft 기반)
@@ -204,7 +210,10 @@ const ContentsManagement: React.FC<{
       }
     } catch (error) {
       console.error("콘텐츠 상세 조회 실패:", error);
-      alert("콘텐츠 상세 조회에 실패했습니다.");
+      setAlertModal({
+        message: "콘텐츠 상세 조회에 실패했습니다.",
+        type: "error",
+      });
     }
   };
 
@@ -251,7 +260,10 @@ const ContentsManagement: React.FC<{
       }
     } catch (error) {
       console.error("콘텐츠 상세 조회 실패:", error);
-      alert("콘텐츠 상세 조회에 실패했습니다.");
+      setAlertModal({
+        message: "콘텐츠 상세 조회에 실패했습니다.",
+        type: "error",
+      });
     }
   };
 
@@ -364,15 +376,16 @@ const ContentsManagement: React.FC<{
           next.delete(selectedContent.contentId);
           return next;
         });
-        alert("수정되었습니다.");
+        setAlertModal({ message: "수정되었습니다.", type: "success" });
       } else if (requestedActive && actualStatus && actualStatus !== "ACTIVE") {
         // 트랜스코딩 완료 대기를 위해 SSE 구독 시작
         startTranscodeWatch(selectedContent.contentId);
-        alert(
-          `트랜스코딩이 아직 완료되지 않아 활성화할 수 없습니다.\nSSE로 트랜스코딩 완료를 감지 중입니다.\n완료되면 목록이 자동 갱신됩니다.`,
-        );
+        setAlertModal({
+          message: `트랜스코딩이 아직 완료되지 않아 활성화할 수 없습니다.\nSSE로 트랜스코딩 완료를 감지 중입니다.\n완료되면 목록이 자동 갱신됩니다.`,
+          type: "info",
+        });
       } else {
-        alert("수정되었습니다.");
+        setAlertModal({ message: "수정되었습니다.", type: "success" });
       }
       setShowDetailModal(false);
       loadContents();
@@ -382,19 +395,19 @@ const ContentsManagement: React.FC<{
         error.response?.data?.message ||
         error.response?.data?.data ||
         "수정에 실패했습니다.";
-      alert(`수정 실패: ${msg}`);
+      setAlertModal({ message: `수정 실패: ${msg}`, type: "error" });
     }
   };
 
   const handleDelete = async (contentId: number) => {
     try {
       await adminService.deleteContent(contentId);
-      alert("삭제되었습니다.");
+      setAlertModal({ message: "삭제되었습니다.", type: "success" });
       setDeleteTarget(null);
       loadContents();
     } catch (error) {
       console.error("삭제 실패:", error);
-      alert("삭제에 실패했습니다.");
+      setAlertModal({ message: "삭제에 실패했습니다.", type: "error" });
     }
   };
 
@@ -672,7 +685,10 @@ const ContentsManagement: React.FC<{
       setTimeout(() => clearInterval(pollInterval), 300000);
     } catch (error) {
       console.error("메타데이터 저장 실패:", error);
-      alert("메타데이터 저장에 실패했습니다.");
+      setAlertModal({
+        message: "메타데이터 저장에 실패했습니다.",
+        type: "error",
+      });
     }
   };
 
@@ -1920,6 +1936,17 @@ const ContentsManagement: React.FC<{
             )}
           </div>
         </div>
+      )}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => {
+            const cb = alertModal.onClose;
+            setAlertModal(null);
+            cb?.();
+          }}
+        />
       )}
     </div>
   );

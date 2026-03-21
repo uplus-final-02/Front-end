@@ -13,6 +13,8 @@ import {
   Calendar,
   Loader2,
   Film,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import VideoPlayer from "@/components/common/VideoPlayer";
 import ContentModal from "@/components/content/ContentModal";
@@ -91,6 +93,13 @@ const CreatorPage: React.FC = () => {
 
   // ── 패널 / UI 상태 ──
   const [openPanel, setOpenPanel] = useState<PanelType>(null);
+
+  // ── 키보드 힌트 (최초 1회) ── TODO: 테스트 끝나면 localStorage 조건 복원
+  const [showKeyHint, setShowKeyHint] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowKeyHint(false), 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ── 댓글 상태 ──
   const [comments, setComments] = useState<Comment[]>([]);
@@ -300,6 +309,34 @@ const CreatorPage: React.FC = () => {
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
   }, [currentIndex, feedItems.length, hasMore, feedLoading, loadFeed]);
+
+  // ── 키보드 방향키로 영상 이동 ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // input/textarea 포커스 중이면 무시
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      if (e.key === "ArrowDown" && currentIndex < feedItems.length - 1) {
+        e.preventDefault();
+        container.scrollTo({
+          top: (currentIndex + 1) * container.clientHeight,
+          behavior: "smooth",
+        });
+      } else if (e.key === "ArrowUp" && currentIndex > 0) {
+        e.preventDefault();
+        container.scrollTo({
+          top: (currentIndex - 1) * container.clientHeight,
+          behavior: "smooth",
+        });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, feedItems.length]);
 
   // ── 핸들러 ──
   const handleShare = () => {
@@ -755,6 +792,28 @@ const CreatorPage: React.FC = () => {
         <div className="flex items-center gap-0 relative h-full">
           {/* 영상 영역 */}
           <div className="relative h-full" style={{ width: "480px" }}>
+            {/* 키보드 힌트 오버레이 */}
+            {showKeyHint && (
+              <div
+                className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+                style={{ animation: "fadeOut 0.5s ease 2.5s forwards" }}
+              >
+                <style>{`@keyframes fadeOut{to{opacity:0}}@keyframes hintBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}`}</style>
+                <div className="bg-black/70 backdrop-blur-sm rounded-2xl px-8 py-6 flex flex-col items-center gap-3">
+                  <div style={{ animation: "hintBounce 1s ease infinite" }}>
+                    <ChevronUp className="w-7 h-7 text-white" />
+                  </div>
+                  <span className="text-white text-sm font-medium">
+                    위, 아래 방향키로 영상 이동
+                  </span>
+                  <div
+                    style={{ animation: "hintBounce 1s ease infinite 0.5s" }}
+                  >
+                    <ChevronDown className="w-7 h-7 text-white" />
+                  </div>
+                </div>
+              </div>
+            )}
             <div
               ref={containerRef}
               className="h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"

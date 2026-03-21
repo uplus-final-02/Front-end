@@ -212,12 +212,12 @@ const StudioPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.videoFile) {
-      alert("비디오 파일을 선택해주세요.");
-      return;
-    }
     if (!formData.title.trim()) {
       alert("제목을 입력해주세요.");
+      return;
+    }
+    if (!formData.videoFile) {
+      alert("비디오 파일을 선택해주세요.");
       return;
     }
     if (!selectedParent) {
@@ -957,18 +957,33 @@ const StudioPage: React.FC = () => {
                 </ul>
               </div>
 
-              <div className="flex space-x-3">
-                <button type="submit" className="flex-1 btn-primary">
-                  <Upload className="w-5 h-5 inline mr-2" />
-                  업로드
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPageStep("dashboard")}
-                  className="btn-secondary"
-                >
-                  취소
-                </button>
+              <div className="flex flex-col gap-2">
+                {(!formData.title.trim() || !formData.videoFile) && (
+                  <p className="text-red-400 text-sm">
+                    {!formData.title.trim() && !formData.videoFile
+                      ? "제목과 비디오 파일을 입력해주세요."
+                      : !formData.title.trim()
+                        ? "제목을 입력해주세요."
+                        : "비디오 파일을 선택해주세요."}
+                  </p>
+                )}
+                <div className="flex space-x-3">
+                  <button
+                    type="submit"
+                    disabled={!formData.title.trim() || !formData.videoFile}
+                    className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Upload className="w-5 h-5 inline mr-2" />
+                    업로드
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageStep("dashboard")}
+                    className="btn-secondary"
+                  >
+                    취소
+                  </button>
+                </div>
               </div>
             </form>
           </div>

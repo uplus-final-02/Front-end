@@ -83,43 +83,45 @@ export const ADMIN_JOB_STATUS_MAP: Record<AdminJobStatus, StatusBadge> = {
   FAILED: { label: "실패", color: "bg-red-500/20 text-red-400" },
 };
 
-export interface AdminMetricsDashboardBucketSummary {
+export interface AdminMetricsDashboardBucketItem {
   bucketStartAt: string;
   rowsCount: number;
-  viewDeltaSum: number;
-  bookmarkDeltaSum: number;
-  completedDeltaSum: number;
+  sumDeltaView: number;
+  sumDeltaBookmark: number;
+  sumDeltaCompleted: number;
   jobStatus: AdminJobStatus;
-  message: string | null;
+  jobMessage: string | null;
 }
 
-export interface AdminMetricsDashboardTrendingSummary {
+export interface AdminMetricsDashboardHourItem {
   calculatedAt: string;
   jobStatus: AdminJobStatus;
-  message: string | null;
-  trendingHistoryCount: number;
-}
-
-export interface AdminMetricsDashboardVerifySummary {
-  calculatedAt: string;
-  matchedCount: number;
-  mismatchedCount: number;
+  jobMessage: string | null;
+  trendingRowsCount: number;
+  trendingSumDeltaView: number;
+  trendingSumDeltaBookmark: number;
+  trendingSumDeltaCompleted: number;
+  snapshotSumDeltaView: number;
+  snapshotSumDeltaBookmark: number;
+  snapshotSumDeltaCompleted: number;
+  mismatch: boolean;
 }
 
 export interface AdminMetricsDashboard {
-  bucketSummaries: AdminMetricsDashboardBucketSummary[];
-  trendingSummaries: AdminMetricsDashboardTrendingSummary[];
-  verifySummaries: AdminMetricsDashboardVerifySummary[];
+  from: string;
+  to: string;
+  buckets: AdminMetricsDashboardBucketItem[];
+  hours: AdminMetricsDashboardHourItem[];
 }
 
 export interface AdminSnapshotBucketItem {
   bucketStartAt: string;
   rowsCount: number;
-  viewDeltaSum: number;
-  bookmarkDeltaSum: number;
-  completedDeltaSum: number;
+  sumDeltaView: number;
+  sumDeltaBookmark: number;
+  sumDeltaCompleted: number;
   jobStatus: AdminJobStatus;
-  message: string | null;
+  jobMessage: string | null;
 }
 
 export interface AdminSnapshotBucketListParams {
@@ -145,8 +147,15 @@ export type AdminSnapshotBucketPageResponse =
 export interface AdminTrendingTimelineItem {
   calculatedAt: string;
   jobStatus: AdminJobStatus;
-  message: string | null;
-  trendingHistoryCount: number;
+  jobMessage: string | null;
+  trendingRowsCount: number;
+  trendingSumDeltaView: number;
+  trendingSumDeltaBookmark: number;
+  trendingSumDeltaCompleted: number;
+  snapshotSumDeltaView: number;
+  snapshotSumDeltaBookmark: number;
+  snapshotSumDeltaCompleted: number;
+  mismatch: boolean;
 }
 
 export interface AdminTrendingTimelineParams {

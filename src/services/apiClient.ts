@@ -137,7 +137,7 @@ apiClient.interceptors.response.use(
     // 403: 탈퇴 회원 / 권한 없음 등 → 즉시 로그아웃 처리
     if (error.response?.status === 403) {
       // refresh token도 만료 → 로그아웃
-      localStorage.clear();
+      // localStorage.clear();
       return Promise.reject(error);
     }
 

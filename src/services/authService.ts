@@ -172,21 +172,27 @@ export const authService = {
         return user;
       }
     } catch (error: any) {
-      if (error.response?.status === 429) {
+      const status = error.response?.status;
+      const serverMessage = error.response?.data?.message;
+
+      if (status === 401) {
+        throw new Error(serverMessage || "이메일 또는 비밀번호가 올바르지 않습니다.");
+      if (status === 429) {
         throw new Error(
           error.response?.data?.message ||
             "로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.",
         );
       }
-      if (error.response?.status === 409) {
+      if (status === 409) {
         throw new Error(
           "이미 로그인 처리 중입니다. 잠시 후 다시 시도해주세요.",
         );
       }
-      if (error.response?.status === 401) {
+      if (status === 401) {
         throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
       }
-      throw new Error("로그인에 실패했습니다.");
+
+      throw new Error(serverMessage || "로그인에 실패했습니다.");
     }
   },
 

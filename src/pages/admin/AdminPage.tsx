@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import AlertModal from "@/components/common/AlertModal";
 
 import { adminService } from "@/services/adminService";
 import Statistics from "./Statistics";
@@ -140,6 +141,10 @@ const UsersManagement: React.FC<{
     null,
   );
   const [detailLoading, setDetailLoading] = useState(false);
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -175,7 +180,10 @@ const UsersManagement: React.FC<{
       setSelectedUser(detail);
     } catch (error) {
       console.error("사용자 상세 조회 실패:", error);
-      alert("사용자 상세 정보를 불러올 수 없습니다.");
+      setAlertModal({
+        message: "사용자 상세 정보를 불러올 수 없습니다.",
+        type: "error",
+      });
     } finally {
       setDetailLoading(false);
     }
@@ -441,6 +449,13 @@ const UsersManagement: React.FC<{
             ) : null}
           </div>
         </div>
+      )}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => setAlertModal(null)}
+        />
       )}
     </div>
   );

@@ -52,6 +52,7 @@ const bookmarkToContent = (bookmark: BookmarkItem): Content => ({
   thumbnailUrl: bookmark.thumbnailUrl,
   tags: bookmark.category ? [bookmark.category] : [],
   isSeries: bookmark.contentType === "SERIES",
+  isDeleted: bookmark.isDeleted,
   // Fill with default values for ContentCard compatibility
   description: "",
   viewCount: 0,

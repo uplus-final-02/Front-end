@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, Bookmark } from "lucide-react";
+import { Eye, Bookmark, Trash2 } from "lucide-react";
 import { Content } from "@/types";
 
 interface ContentCardProps {
@@ -82,6 +82,48 @@ const ContentCard: React.FC<ContentCardProps> = ({
     );
   }
 
+  // 삭제된 콘텐츠 모드 (북마크에서 삭제된 콘텐츠 표시)
+  if (content.isDeleted) {
+    return (
+      <div
+        className="cursor-default relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="relative aspect-video overflow-hidden rounded-lg">
+          <img
+            src={thumbnailUrl || "/placeholder.png"}
+            alt={content.title}
+            className="w-full h-full object-cover filter blur-sm brightness-50"
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="bg-black/70 text-gray-300 text-sm px-3 py-1.5 rounded">
+              삭제된 콘텐츠
+            </span>
+          </div>
+          {/* 호버 시 휴지통 삭제 버튼 */}
+          {isHovered && _onBookmarkToggle && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  _onBookmarkToggle(content.id);
+                }}
+                className="bg-red-600 hover:bg-red-500 text-white p-3 rounded-full transition-colors"
+                title="북마크에서 삭제"
+              >
+                <Trash2 className="w-6 h-6" />
+              </button>
+            </div>
+          )}
+        </div>
+        <h3 className="font-semibold text-base mt-2 line-clamp-1 text-gray-500">
+          {content.title}
+        </h3>
+      </div>
+    );
+  }
+
   // 일반 모드 (호버 확대 기능)
   return (
     <div
@@ -146,12 +188,12 @@ const ContentCard: React.FC<ContentCardProps> = ({
             )}
           </div>
           {simpleHover ? (
-            // 간소화 모드: 제목 + 재생 버튼만
+            // 간소화 모드: 제목 + 재생 버튼 + 북마크 토글
             <div className="p-4">
               <h3 className="font-semibold text-lg mb-3 line-clamp-1">
                 {content.title}
               </h3>
-              <div className="flex items-center">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -165,6 +207,18 @@ const ContentCard: React.FC<ContentCardProps> = ({
                 >
                   재생
                 </button>
+                {_onBookmarkToggle && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      _onBookmarkToggle(content.id);
+                    }}
+                    className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                    title="북마크 삭제"
+                  >
+                    <Bookmark className="w-5 h-5 text-primary fill-primary" />
+                  </button>
+                )}
               </div>
             </div>
           ) : (

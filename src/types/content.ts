@@ -49,6 +49,8 @@ export interface Content {
   highlightTitle?: string | null;
   highlightDescription?: string | null;
   matchType?: string;
+  // 북마크에서 삭제된 콘텐츠 표시용
+  isDeleted?: boolean;
 }
 
 export interface Episode {

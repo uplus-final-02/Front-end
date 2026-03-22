@@ -22,6 +22,7 @@ import { commentService, type CommentDto } from "@/services/commentService";
 import { useAuth } from "@/contexts/AuthContext";
 import VideoPlayer from "@/components/common/VideoPlayer";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import AlertModal from "@/components/common/AlertModal";
 
 const ContentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +54,10 @@ const ContentDetailPage: React.FC = () => {
   const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
   const shouldAutoPlay = searchParams.get("autoplay") === "true";
   const episodeParam = searchParams.get("episode");
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   // 전체화면 토글
   const handleToggleFullscreen = () => {
@@ -276,7 +281,10 @@ const ContentDetailPage: React.FC = () => {
       }
     } catch (error: any) {
       console.error("찜하기 실패:", error);
-      alert(error.response?.data?.message || "찜하기에 실패했습니다.");
+      setAlertModal({
+        message: error.response?.data?.message || "찜하기에 실패했습니다.",
+        type: "error",
+      });
     }
   };
 
@@ -1067,6 +1075,13 @@ const ContentDetailPage: React.FC = () => {
           cancelText="취소"
           onConfirm={() => handleDeleteComment(deleteTargetCommentId)}
           onCancel={() => setDeleteTargetCommentId(null)}
+        />
+      )}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => setAlertModal(null)}
         />
       )}
     </div>

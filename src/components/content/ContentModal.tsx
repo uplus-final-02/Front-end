@@ -5,6 +5,7 @@ import { Content } from "@/types";
 import { contentService } from "@/services/contentService";
 import { bookmarkService } from "@/services/bookmarkService";
 import { useAuth } from "@/contexts/AuthContext";
+import AlertModal from "@/components/common/AlertModal";
 
 interface ContentModalProps {
   content: Content;
@@ -22,6 +23,10 @@ const ContentModal: React.FC<ContentModalProps> = ({
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -110,7 +115,7 @@ const ContentModal: React.FC<ContentModalProps> = ({
         error.response?.data?.message ||
         error.response?.data?.error ||
         "찜하기에 실패했습니다.";
-      alert(errorMessage);
+      setAlertModal({ message: errorMessage, type: "error" });
     }
   };
 
@@ -349,6 +354,13 @@ const ContentModal: React.FC<ContentModalProps> = ({
             )}
         </div>
       </div>
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </div>
   );
 };

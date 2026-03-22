@@ -24,6 +24,7 @@ import {
   type TranscodeResultEvent,
 } from "@/services/sseService";
 import type { Content } from "@/types";
+import AlertModal from "@/components/common/AlertModal";
 
 type PageStep =
   | "dashboard"
@@ -86,6 +87,10 @@ const StudioPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const [autoPublished, setAutoPublished] = useState(false);
   const sseRef = useRef<SSESubscription | null>(null);
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   // SSE 정리
   useEffect(() => {
@@ -213,15 +218,15 @@ const StudioPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      alert("제목을 입력해주세요.");
+      setAlertModal({ message: "제목을 입력해주세요.", type: "info" });
       return;
     }
     if (!formData.videoFile) {
-      alert("비디오 파일을 선택해주세요.");
+      setAlertModal({ message: "비디오 파일을 선택해주세요.", type: "info" });
       return;
     }
     if (!selectedParent) {
-      alert("원본 콘텐츠를 선택해주세요.");
+      setAlertModal({ message: "원본 콘텐츠를 선택해주세요.", type: "info" });
       return;
     }
 
@@ -383,7 +388,10 @@ const StudioPage: React.FC = () => {
       );
       setEditTarget(null);
     } catch (err: any) {
-      alert(err?.response?.data?.message || "수정에 실패했습니다.");
+      setAlertModal({
+        message: err?.response?.data?.message || "수정에 실패했습니다.",
+        type: "error",
+      });
     } finally {
       setEditSaving(false);
     }
@@ -403,7 +411,10 @@ const StudioPage: React.FC = () => {
       );
       setDeleteTarget(null);
     } catch (err: any) {
-      alert(err?.response?.data?.message || "삭제에 실패했습니다.");
+      setAlertModal({
+        message: err?.response?.data?.message || "삭제에 실패했습니다.",
+        type: "error",
+      });
     } finally {
       setDeleteLoading(false);
     }
@@ -687,6 +698,13 @@ const StudioPage: React.FC = () => {
                 </div>
               </div>
             </div>
+          )}
+          {alertModal && (
+            <AlertModal
+              message={alertModal.message}
+              type={alertModal.type}
+              onClose={() => setAlertModal(null)}
+            />
           )}
         </div>
       </div>
@@ -989,6 +1007,13 @@ const StudioPage: React.FC = () => {
           </div>
         </div>
       </div>
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => setAlertModal(null)}
+        />
+      )}
     </div>
   );
 };

@@ -20,6 +20,7 @@ import VideoPlayer from "@/components/common/VideoPlayer";
 import ContentModal from "@/components/content/ContentModal";
 import { useAuth } from "@/contexts/AuthContext";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import AlertModal from "@/components/common/AlertModal";
 import { contentService } from "@/services/contentService";
 import {
   creatorService,
@@ -110,6 +111,10 @@ const CreatorPage: React.FC = () => {
   const [deleteTargetCommentId, setDeleteTargetCommentId] = useState<
     number | null
   >(null);
+  const [alertModal, setAlertModal] = useState<{
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   // ── refs ──
   const viewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -344,7 +349,7 @@ const CreatorPage: React.FC = () => {
       ? `${window.location.origin}/creator/${currentItem.userContentId}`
       : window.location.href;
     navigator.clipboard.writeText(url);
-    alert("URL이 복사되었습니다.");
+    setAlertModal({ message: "URL이 복사되었습니다.", type: "success" });
   };
 
   const handleSubmitComment = async () => {
@@ -1166,6 +1171,13 @@ const CreatorPage: React.FC = () => {
             setDeleteTargetCommentId(null);
           }}
           onCancel={() => setDeleteTargetCommentId(null)}
+        />
+      )}
+      {alertModal && (
+        <AlertModal
+          message={alertModal.message}
+          type={alertModal.type}
+          onClose={() => setAlertModal(null)}
         />
       )}
     </>

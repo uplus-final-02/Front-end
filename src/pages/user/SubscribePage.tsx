@@ -18,7 +18,6 @@ const SubscribePage: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
   const [loadingSub, setLoadingSub] = useState(true);
-  const [subscribing, setSubscribing] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [alertModal, setAlertModal] = useState<{
@@ -39,12 +38,20 @@ const SubscribePage: React.FC = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [verifying, setVerifying] = useState(false);
 
+  // 결제
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<
+    "CARD" | "KAKAO_PAY" | "NAVER_PAY" | null
+  >(null);
+  const [subscribing, setSubscribing] = useState(false);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       navigate("/login");
       return;
     }
+
     loadProfile();
     loadSubscription();
   }, [user, authLoading]);
@@ -53,8 +60,9 @@ const SubscribePage: React.FC = () => {
     try {
       const data = await profileService.getMyProfile();
       setProfile(data);
-    } catch (error) {
-      console.error("프로필 로딩 실패:", error);
+    } catch (error:any) {
+      console.error("프로필 로딩 실패:", error?.response?.data || error);
+      setProfile(null);
     }
   };
 
@@ -63,21 +71,43 @@ const SubscribePage: React.FC = () => {
     try {
       const info = await subscriptionService.getMySubscription();
       setSubInfo(info);
-    } catch {
+    } catch (error: any) {
+      console.error("구독 로딩 실패:", error?.response?.data || error);
       setSubInfo(null);
     } finally {
       setLoadingSub(false);
     }
   };
 
+
+  const handleOpenSubscribeModal = () => {
+    console.log("open payment modal");
+    if (subIsPaid || subIsUplus) return;
+    setSelectedProvider(null);
+    setShowPaymentModal(true);
+  };
+
   const handleSubscribe = async () => {
-    setSubscribing(true);
+    if (!selectedProvider) {
+      showAlert("결제 수단을 선택해주세요.", "error");
+      return;
+    }
+
+  setSubscribing(true);
+
     try {
-      await subscriptionService.subscribe("CARD");
+      // mock 결제 진행 연출
+      await new Promise((resolve) => setTimeout(resolve, 900));
+
+      await subscriptionService.subscribe(selectedProvider);
+      
+      setSelectedProvider(null);
+      setShowPaymentModal(false);
+
       showAlert("베이직 구독이 완료되었습니다!", "success");
       await refreshAuth();
-      loadSubscription();
-      loadProfile();
+      await loadSubscription();
+      await loadProfile();
     } catch (error: any) {
       showAlert(
         error.response?.data?.message || "구독 처리 중 오류가 발생했습니다.",
@@ -94,7 +124,8 @@ const SubscribePage: React.FC = () => {
       await subscriptionService.cancelSubscription();
       setShowCancelModal(false);
       showAlert(
-        "구독 해지가 예약되었습니다. 만료일까지 이용 가능합니다.",
+        `구독 해지가 예약되었습니다.
+        만료일까지 이용 가능합니다.`,
         "success",
       );
       await refreshAuth();
@@ -144,41 +175,50 @@ const SubscribePage: React.FC = () => {
   const refreshAuth = async () => {
     try {
       const refreshToken = localStorage.getItem("refreshToken");
-      if (refreshToken) {
-        const { default: axios } = await import("axios");
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
-        const response = await axios.post(
-          `${baseUrl}/api/auth/reissue`,
-          { refreshToken },
-          { headers: { "Content-Type": "application/json" } },
-        );
-        const { accessToken, refreshToken: newRefresh } = response.data.data;
-        localStorage.setItem("accessToken", accessToken);
-        if (newRefresh) localStorage.setItem("refreshToken", newRefresh);
+      if (!refreshToken)  return;
 
-        try {
+      const { default: axios } = await import("axios");
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
+
+      const response = await axios.post(
+        `${baseUrl}/api/auth/reissue`,
+        { refreshToken },
+        { headers: { "Content-Type": "application/json" } },
+      );
+
+      const { accessToken, refreshToken: newRefresh } = response.data.data;
+
+      localStorage.setItem("accessToken", accessToken);
+      if (newRefresh) {
+        localStorage.setItem("refreshToken", newRefresh);
+      }
+
+      try {
           const freshProfile = await profileService.getMyProfile();
+          const isPaidUser = freshProfile.subscriptionStatus === "SUBSCRIBED";
+
           await updateUser({
             isLGUPlus: freshProfile.isUPlusMember || false,
-            paid: freshProfile.subscriptionStatus === "SUBSCRIBED",
-            subscriptionType:
-              freshProfile.subscriptionStatus === "SUBSCRIBED"
-                ? "basic"
-                : "none",
+            paid: isPaidUser,
+            subscriptionType: isPaidUser ? "basic" : "none",
           });
         } catch {
           // 프로필 조회 실패는 무시
         }
-      }
     } catch {
       // 재발급 실패는 무시
     }
   };
 
-  const subIsPaid = subInfo?.paid === true;
+  // const subIsPaid = subInfo?.paid === true;
   const subIsUplus =
     user?.isLGUPlus === true || profile?.isUPlusMember === true;
-  const subIsCanceled = subInfo?.subscriptionStatus === "CANCELED";
+
+  const subIsBasicActive = subInfo?.grade === "BASIC" && subInfo?.subscriptionStatus === "ACTIVE";
+
+  const subIsCanceled = subInfo?.grade === "BASIC" && subInfo?.subscriptionStatus === "CANCELED";
+
+  const subIsPaid = subIsBasicActive || subIsCanceled;
 
   const getMemberStatus = () => {
     if (subIsUplus) return "LG U+ 회원";
@@ -338,7 +378,7 @@ const SubscribePage: React.FC = () => {
               </div>
             ) : !subIsPaid ? (
               <button
-                onClick={handleSubscribe}
+                onClick={handleOpenSubscribeModal}
                 disabled={subscribing}
                 className="w-full btn-primary py-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
@@ -351,6 +391,7 @@ const SubscribePage: React.FC = () => {
                   "베이직 플랜 구독하기"
                 )}
               </button>
+              
             ) : subIsCanceled ? (
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-center">
                 <p className="text-yellow-400 font-semibold text-sm">
@@ -369,6 +410,99 @@ const SubscribePage: React.FC = () => {
               </button>
             )}
           </div>
+          
+          {showPaymentModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+              <div className="w-full max-w-md rounded-2xl bg-[#1b1b1f] border border-gray-700 p-6 shadow-xl">
+                <div className="flex items-center justify-between mb-5">
+                  <h3 className="text-xl font-bold text-white">결제 수단 선택</h3>
+                  <button
+                    onClick={() => {
+                      if (!subscribing) {
+                        setShowPaymentModal(false);
+                        setSelectedProvider(null);
+                      }
+                    }}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-3 mb-5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider("CARD")}
+                    className={`w-full rounded-xl border px-4 py-4 text-left transition ${
+                      selectedProvider === "CARD"
+                        ? "border-pink-500 bg-pink-500/10"
+                        : "border-gray-700 bg-gray-800 hover:bg-gray-700"
+                    }`}
+                  >
+                    <div className="font-semibold text-white">카드 결제</div>
+                    <div className="text-sm text-gray-400">일반 카드 결제</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider("KAKAO_PAY")}
+                    className={`w-full rounded-xl border px-4 py-4 text-left transition ${
+                      selectedProvider === "KAKAO_PAY"
+                        ? "border-pink-500 bg-pink-500/10"
+                        : "border-gray-700 bg-gray-800 hover:bg-gray-700"
+                    }`}
+                  >
+                    <div className="font-semibold text-white">카카오페이</div>
+                    <div className="text-sm text-gray-400">간편 결제</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider("NAVER_PAY")}
+                    className={`w-full rounded-xl border px-4 py-4 text-left transition ${
+                      selectedProvider === "NAVER_PAY"
+                        ? "border-pink-500 bg-pink-500/10"
+                        : "border-gray-700 bg-gray-800 hover:bg-gray-700"
+                    }`}
+                  >
+                    <div className="font-semibold text-white">네이버페이</div>
+                    <div className="text-sm text-gray-400">간편 결제</div>
+                  </button>
+                </div>
+
+                <div className="rounded-lg bg-gray-800 px-4 py-3 mb-5">
+                  <p className="text-sm text-gray-300">
+                    선택한 결제수단으로 mock 결제가 진행됩니다.
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!subscribing) {
+                        setShowPaymentModal(false);
+                        setSelectedProvider(null);
+                      }
+                    }}
+                    disabled={subscribing}
+                    className="flex-1 rounded-xl bg-gray-700 py-3 text-white hover:bg-gray-600 disabled:opacity-50"
+                  >
+                    취소
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSubscribe}
+                    disabled={!selectedProvider || subscribing}
+                    className="flex-1 rounded-xl bg-pink-500 py-3 font-semibold text-white hover:bg-pink-400 disabled:opacity-50"
+                  >
+                    {subscribing ? "결제 진행 중..." : "결제 진행"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 카드 2: LG U+ 회원 인증 */}
           <div className="bg-gray-900 rounded-lg p-8">
@@ -409,11 +543,8 @@ const SubscribePage: React.FC = () => {
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-center">
                 <Crown className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
                 <p className="text-yellow-400 font-semibold text-sm">
-                  베이직 구독 중에는 U+ 인증을 할 수 없습니다.
-                  <br />
-                  {subIsCanceled
-                    ? "구독 만료 후 인증해주세요."
-                    : "구독 해지 후 인증해주세요."}
+                  현재 BASIC 구독 중인 계정은 해지 신청 후 구독 만료일이 지나면
+                  LG U+ 인증을 진행할 수 있습니다.
                 </p>
               </div>
             ) : (

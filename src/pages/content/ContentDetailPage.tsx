@@ -216,8 +216,10 @@ const ContentDetailPage: React.FC = () => {
     } catch (error: any) {
       console.error("재생 정보 조회 실패:", error);
       const status = error.response?.status;
+      const serverMessage = error.response?.data?.message;
+
       if (status === 403) {
-        setPlayError("이 콘텐츠는 구독 회원만 시청할 수 있습니다.");
+        setPlayError(serverMessage || "이 콘텐츠는 구독 회원만 시청할 수 있습니다.");
       } else if (status === 404) {
         setPlayError("영상 파일을 찾을 수 없습니다.");
       } else if (status === 409) {
@@ -530,13 +532,42 @@ const ContentDetailPage: React.FC = () => {
                     <div className="text-center">
                       <AlertCircle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
                       <p className="text-xl mb-4">{playError}</p>
-                      {playError.includes("구독") && (
+                      {/* {playError.includes("구독") && (
                         <button
                           onClick={() => navigate("/subscribe")}
                           className="btn-primary"
                         >
                           구독하기
                         </button>
+                      )} */}
+
+                      {playError === "LG U+ 회원 전용 콘텐츠입니다." && (
+                        <div className="space-y-3">
+                          <p className="text-sm text-gray-400 leading-relaxed">
+                            현재 BASIC 구독 중인 계정은 해지 신청 후 구독 만료일이 지나면
+                            LG U+ 인증을 진행할 수 있습니다.
+                          </p>
+                          <button
+                            onClick={() => navigate("/subscribe")}
+                            className="btn-primary"
+                          >
+                            구독 관리
+                          </button>
+                        </div>
+                      )}
+
+                      {playError === "LG U+ 회원 인증이 필요한 콘텐츠입니다." && (
+                        <div className="space-y-3">
+                          <p className="text-sm text-gray-400 leading-relaxed">
+                            LG U+ 회원 인증 후 시청할 수 있습니다.
+                          </p>
+                          <button
+                            onClick={() => navigate("/subscribe")}
+                            className="btn-primary"
+                          >
+                            구독 관리
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

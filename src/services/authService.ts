@@ -172,10 +172,14 @@ export const authService = {
         return user;
       }
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
+      const status = error.response?.status;
+      const serverMessage = error.response?.data?.message;
+
+      if (status === 401) {
+        throw new Error(serverMessage || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }
-      throw new Error("로그인에 실패했습니다.");
+
+      throw new Error(serverMessage || "로그인에 실패했습니다.");
     }
   },
 

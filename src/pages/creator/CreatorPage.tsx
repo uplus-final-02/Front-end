@@ -308,13 +308,6 @@ const CreatorPage: React.FC = () => {
       loadComments();
     }
   }, [openPanel, activePlayInfo?.videoId, loadComments]);
-
-  // 댓글 패널 열면 다시 조회
-  useEffect(() => {
-    if (openPanel === "comments" && activePlayInfo?.videoId) {
-      loadComments();
-    }
-  }, [openPanel, activePlayInfo?.videoId, loadComments]);
     
   // ── 스크롤 스냅 ──
   useEffect(() => {

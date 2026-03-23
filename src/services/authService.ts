@@ -176,7 +176,10 @@ export const authService = {
       const serverMessage = error.response?.data?.message;
 
       if (status === 401) {
-        throw new Error(serverMessage || "이메일 또는 비밀번호가 올바르지 않습니다.");
+        throw new Error(
+          serverMessage || "이메일 또는 비밀번호가 올바르지 않습니다.",
+        );
+      }
       if (status === 429) {
         throw new Error(
           error.response?.data?.message ||

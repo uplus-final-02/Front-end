@@ -148,7 +148,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -157,7 +157,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     } else {
       video.pause();
     }
-  };
+  }, []);
 
   const handleTimeUpdate = () => {
     const video = videoRef.current;
@@ -279,11 +279,36 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         skipTime(10);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const video = videoRef.current;
+        if (!video) return;
+        const newVol = Math.min(1, video.volume + 0.05);
+        video.volume = newVol;
+        video.muted = false;
+        setVolume(newVol);
+        setIsMuted(false);
+        localStorage.setItem("utopia_volume", String(newVol));
+        localStorage.setItem("utopia_muted", "false");
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const video = videoRef.current;
+        if (!video) return;
+        const newVol = Math.max(0, video.volume - 0.05);
+        video.volume = newVol;
+        video.muted = newVol === 0;
+        setVolume(newVol);
+        setIsMuted(newVol === 0);
+        localStorage.setItem("utopia_volume", String(newVol));
+        localStorage.setItem("utopia_muted", String(newVol === 0));
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [shortsMode]);
+  }, [shortsMode, togglePlay]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

@@ -338,7 +338,7 @@ export const authService = {
         localStorage.setItem(TOKEN_KEY, data.accessToken);
         localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
 
-        // JWT 디코딩해서 사용자 정보 추출 (한글 지원)
+        // JWT 디코딩 + 프로필 API로 구독 상태 포함한 사용자 정보 구성
         try {
           const base64Url = data.accessToken.split(".")[1];
           const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -351,14 +351,38 @@ export const authService = {
           const payload = JSON.parse(jsonPayload);
           console.log("JWT 페이로드:", payload); // 디버깅용
 
+          const userId = parseInt(payload.sub) || 1;
+
+          // 프로필 API 호출하여 구독 상태 포함한 정보 가져오기
+          let subscriptionType: "none" | "basic" | "premium" = "none";
+          let isLGUPlus = false;
+          let paid = false;
+          let nickname = payload.nickname || "사용자";
+          let preferredTags: string[] = [];
+          try {
+            const profileResponse = await apiClient.get("/api/profile/mypage", {
+              params: { userId },
+            });
+            const profile = profileResponse.data.data;
+            subscriptionType =
+              profile.subscriptionStatus === "SUBSCRIBED" ? "basic" : "none";
+            isLGUPlus = profile.isUPlusMember || false;
+            paid = profile.subscriptionStatus === "SUBSCRIBED";
+            nickname = profile.nickname || nickname;
+            preferredTags =
+              profile.preferredTags?.map((tag: any) => tag.name) || [];
+          } catch (profileError) {
+            console.error("소셜 로그인 프로필 조회 실패:", profileError);
+          }
+
           const user: User = {
             id: payload.sub || "current",
             email: payload.email || "",
-            nickname: payload.nickname || "사용자",
-            preferredTags: [],
-            subscriptionType: "none",
-            isLGUPlus: false,
-            paid: false,
+            nickname,
+            preferredTags,
+            subscriptionType,
+            isLGUPlus,
+            paid,
             joinDate: new Date().toISOString(),
             role: payload.role || "USER",
           };

@@ -129,7 +129,8 @@ export const authService = {
           id: profile.userId.toString(),
           email: profile.email,
           nickname: profile.nickname,
-          preferredTags: profile.preferredTags.map((tag: any) => tag.name), // 태그 이름 배열
+          profileImageUrl: profile.profileImageUrl || null,
+          preferredTags: profile.preferredTags.map((tag: any) => tag.name),
           subscriptionType:
             profile.subscriptionStatus === "SUBSCRIBED" ? "basic" : "none",
           isLGUPlus: profile.isUPlusMember || false,
@@ -359,6 +360,7 @@ export const authService = {
           let paid = false;
           let nickname = payload.nickname || "사용자";
           let preferredTags: string[] = [];
+          let profileImageUrl: string | null = null;
           try {
             const profileResponse = await apiClient.get("/api/profile/mypage", {
               params: { userId },
@@ -371,6 +373,7 @@ export const authService = {
             nickname = profile.nickname || nickname;
             preferredTags =
               profile.preferredTags?.map((tag: any) => tag.name) || [];
+            profileImageUrl = profile.profileImageUrl || null;
           } catch (profileError) {
             console.error("소셜 로그인 프로필 조회 실패:", profileError);
           }
@@ -379,6 +382,7 @@ export const authService = {
             id: payload.sub || "current",
             email: payload.email || "",
             nickname,
+            profileImageUrl,
             preferredTags,
             subscriptionType,
             isLGUPlus,

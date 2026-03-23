@@ -100,20 +100,19 @@ function createSSEConnection(
           if (line.startsWith("event:")) {
             currentEvent = line.slice(6).trim();
           } else if (line.startsWith("data:")) {
-            const eventName = currentEvent;
-            if (eventName === "TRANSCODE_RESULT") {
-              try {
-                const data = JSON.parse(
-                  line.slice(5).trim(),
-                ) as TranscodeResultEvent;
+            const dataStr = line.slice(5).trim();
+            if (!dataStr) continue;
+            try {
+              const data = JSON.parse(dataStr) as TranscodeResultEvent;
+              // TRANSCODE_RESULT 이벤트이거나, transcodeStatus 필드가 있으면 처리
+              if (currentEvent === "TRANSCODE_RESULT" || data.transcodeStatus) {
                 console.log("[SSE] TRANSCODE_RESULT 이벤트:", data);
                 onResult(data);
-              } catch (e) {
-                console.warn("SSE 데이터 파싱 실패:", e);
               }
+            } catch (e) {
+              console.warn("SSE 데이터 파싱 실패:", e);
             }
-            currentEvent = "";
-          } else if (line === "") {
+          } else if (line.trim() === "") {
             currentEvent = "";
           }
         }

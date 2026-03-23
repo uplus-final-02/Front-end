@@ -500,21 +500,6 @@ const CreatorPage: React.FC = () => {
                       </button>
                     )}
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {activePlayInfo?.profileImageUrl ? (
-                          <img
-                            src={activePlayInfo.profileImageUrl}
-                            alt={activePlayInfo.uploaderNickname}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs font-bold text-gray-400">
-                            {activePlayInfo?.uploaderNickname
-                              ?.charAt(0)
-                              .toUpperCase() || <User className="w-5 h-5" />}
-                          </span>
-                        )}
-                      </div>
                       <span className="font-semibold text-sm">
                         @{directPlayInfo.uploaderNickname}
                       </span>
@@ -709,15 +694,11 @@ const CreatorPage: React.FC = () => {
                         {user?.profileImageUrl ? (
                           <img
                             src={user.profileImageUrl}
-                            alt="내 프로필"
+                            alt=""
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <span className="text-xs font-bold text-gray-400">
-                            {user?.nickname?.charAt(0).toUpperCase() || (
-                              <User className="w-4 h-4" />
-                            )}
-                          </span>
+                          <User className="w-4 h-4 text-gray-400" />
                         )}
                       </div>
                       <input
@@ -745,21 +726,6 @@ const CreatorPage: React.FC = () => {
                       {directPlayInfo.title}
                     </h4>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">
-                        {activePlayInfo?.profileImageUrl ? (
-                          <img
-                            src={activePlayInfo.profileImageUrl}
-                            alt={activePlayInfo.uploaderNickname}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-sm font-bold text-gray-400">
-                            {activePlayInfo?.uploaderNickname
-                              ?.charAt(0)
-                              .toUpperCase() || <User className="w-5 h-5" />}
-                          </span>
-                        )}
-                      </div>
                       <span className="font-semibold">
                         @{directPlayInfo.uploaderNickname}
                       </span>
@@ -945,23 +911,6 @@ const CreatorPage: React.FC = () => {
                       )}
                       {playInfo && idx === currentIndex && (
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0">
-                            {playInfo?.profileImageUrl ? (
-                              <img
-                                src={playInfo.profileImageUrl}
-                                alt={playInfo.uploaderNickname}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="text-xs font-bold text-gray-400">
-                                {playInfo?.uploaderNickname
-                                  ?.charAt(0)
-                                  .toUpperCase() || (
-                                  <User className="w-5 h-5" />
-                                )}
-                              </span>
-                            )}
-                          </div>
                           <span className="font-semibold text-sm">
                             @{playInfo.uploaderNickname}
                           </span>
@@ -1146,15 +1095,11 @@ const CreatorPage: React.FC = () => {
                       {user?.profileImageUrl ? (
                         <img
                           src={user.profileImageUrl}
-                          alt="내 프로필"
+                          alt=""
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <span className="text-xs font-bold text-gray-400">
-                          {user?.nickname?.charAt(0).toUpperCase() || (
-                            <User className="w-4 h-4" />
-                          )}
-                        </span>
+                        <User className="w-4 h-4 text-gray-400" />
                       )}
                     </div>
                     <input
@@ -1182,21 +1127,6 @@ const CreatorPage: React.FC = () => {
                     {playInfo.title}
                   </h4>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">
-                      {playInfo?.profileImageUrl ? (
-                        <img
-                          src={playInfo.profileImageUrl}
-                          alt={playInfo.uploaderNickname}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-sm font-bold text-gray-400">
-                          {playInfo?.uploaderNickname
-                            ?.charAt(0)
-                            .toUpperCase() || <User className="w-5 h-5" />}
-                        </span>
-                      )}
-                    </div>
                     <span className="font-semibold">
                       @{playInfo.uploaderNickname}
                     </span>

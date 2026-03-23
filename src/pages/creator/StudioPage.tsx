@@ -805,12 +805,9 @@ const StudioPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <div className="p-3">
-                      <p className="text-sm font-medium line-clamp-2 mb-1">
+                    <div className="px-3 py-2">
+                      <p className="text-sm font-medium line-clamp-2">
                         {content.title}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        조회수 {(content.viewCount ?? 0).toLocaleString()}회
                       </p>
                     </div>
                   </button>

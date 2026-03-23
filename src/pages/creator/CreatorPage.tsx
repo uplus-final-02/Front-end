@@ -295,10 +295,27 @@ const CreatorPage: React.FC = () => {
     }
   }, [activePlayInfo?.videoId]);
 
+  // 영상 바뀌면 댓글 미리 조회
   useEffect(() => {
-    if (openPanel === "comments" && activePlayInfo?.videoId) loadComments();
+    if (activePlayInfo?.videoId) {
+      loadComments();
+    }
+  }, [activePlayInfo?.videoId, loadComments]);
+
+  // 댓글 패널 열면 다시 조회
+  useEffect(() => {
+    if (openPanel === "comments" && activePlayInfo?.videoId) {
+      loadComments();
+    }
   }, [openPanel, activePlayInfo?.videoId, loadComments]);
 
+  // 댓글 패널 열면 다시 조회
+  useEffect(() => {
+    if (openPanel === "comments" && activePlayInfo?.videoId) {
+      loadComments();
+    }
+  }, [openPanel, activePlayInfo?.videoId, loadComments]);
+    
   // ── 스크롤 스냅 ──
   useEffect(() => {
     const container = containerRef.current;
@@ -512,10 +529,19 @@ const CreatorPage: React.FC = () => {
             <div className="flex flex-col items-center justify-end gap-5 px-3 h-full pb-28">
               <button
                 onClick={() => togglePanel("comments")}
-                className={`flex flex-col items-center gap-1 transition-colors ${openPanel === "comments" ? "text-primary" : "text-white hover:text-gray-300"}`}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  openPanel === "comments"
+                    ? "text-primary"
+                    : "text-white hover:text-gray-300"
+                }`}
               >
-                <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center">
+                <div className="relative w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center">
                   <MessageCircle className="w-6 h-6" />
+                  {comments.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center leading-none">
+                      {comments.length > 99 ? "99+" : comments.length}
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs">댓글</span>
               </button>
@@ -529,9 +555,14 @@ const CreatorPage: React.FC = () => {
                 </div>
                 <span className="text-xs">공유</span>
               </button>
+
               <button
                 onClick={() => togglePanel("info")}
-                className={`flex flex-col items-center gap-1 transition-colors ${openPanel === "info" ? "text-primary" : "text-white hover:text-gray-300"}`}
+                className={`flex flex-col items-center gap-1 transition-colors ${
+                  openPanel === "info"
+                    ? "text-primary"
+                    : "text-white hover:text-gray-300"
+                }`}
               >
                 <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center">
                   <Info className="w-6 h-6" />
@@ -933,13 +964,19 @@ const CreatorPage: React.FC = () => {
           </div>
 
           {/* 사이드 액션 버튼 */}
-          <div className="flex flex-col items-center justify-end gap-5 px-3 h-full pb-28">
+          <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center relative">
             <button
               onClick={() => togglePanel("comments")}
               className={`flex flex-col items-center gap-1 transition-colors ${openPanel === "comments" ? "text-primary" : "text-white hover:text-gray-300"}`}
             >
               <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center">
                 <MessageCircle className="w-6 h-6" />
+                {/* 댓글 수*/}
+                {comments.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                    {comments.length}
+                  </span>
+                )}
               </div>
               <span className="text-xs">댓글</span>
             </button>

@@ -24,6 +24,7 @@ import type {
   AdminContentUpdateRequest,
 } from "@/services/adminService";
 import AlertModal from "@/components/common/AlertModal";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 const ContentsManagement: React.FC<{
   searchKeyword: string;
@@ -391,10 +392,7 @@ const ContentsManagement: React.FC<{
       loadContents();
     } catch (error: any) {
       console.error("수정 실패:", error);
-      const msg =
-        error.response?.data?.message ||
-        error.response?.data?.data ||
-        "수정에 실패했습니다.";
+      const msg = getErrorMessage(error, "수정에 실패했습니다.");
       setAlertModal({ message: `수정 실패: ${msg}`, type: "error" });
     }
   };
@@ -455,7 +453,7 @@ const ContentsManagement: React.FC<{
     } catch (error: any) {
       console.error("업로드 실패:", error);
       setUploadStep("error");
-      setUploadProgress(error.message || "업로드에 실패했습니다.");
+      setUploadProgress(getErrorMessage(error, "업로드에 실패했습니다."));
     }
   };
 
@@ -510,7 +508,9 @@ const ContentsManagement: React.FC<{
     } catch (error: any) {
       console.error("시리즈 업로드 실패:", error);
       setUploadStep("error");
-      setUploadProgress(error.message || "시리즈 업로드에 실패했습니다.");
+      setUploadProgress(
+        getErrorMessage(error, "시리즈 업로드에 실패했습니다."),
+      );
     }
   };
 

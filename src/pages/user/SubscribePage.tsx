@@ -10,6 +10,7 @@ import {
 import ConfirmModal from "@/components/common/ConfirmModal";
 import AlertModal from "@/components/common/AlertModal";
 import type { Profile } from "@/types/profile";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 const SubscribePage: React.FC = () => {
   const { user, loading: authLoading, updateUser } = useAuth();
@@ -110,7 +111,7 @@ const SubscribePage: React.FC = () => {
       await loadProfile();
     } catch (error: any) {
       showAlert(
-        error.response?.data?.message || "구독 처리 중 오류가 발생했습니다.",
+        getErrorMessage(error, "구독 처리 중 오류가 발생했습니다."),
         "error",
       );
     } finally {
@@ -133,7 +134,7 @@ const SubscribePage: React.FC = () => {
       loadProfile();
     } catch (error: any) {
       showAlert(
-        error.response?.data?.message || "구독 해지에 실패했습니다.",
+        getErrorMessage(error, "구독 해지에 실패했습니다."),
         "error",
       );
     } finally {
@@ -164,7 +165,7 @@ const SubscribePage: React.FC = () => {
       }
     } catch (error: any) {
       showAlert(
-        error.response?.data?.message || "인증에 실패했습니다.",
+        getErrorMessage(error, "인증에 실패했습니다."),
         "error",
       );
     } finally {

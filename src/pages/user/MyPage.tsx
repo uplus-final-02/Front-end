@@ -38,6 +38,7 @@ import {
   creatorService,
   type UserContentPlayInfo,
 } from "@/services/creatorService";
+import { getErrorMessage } from "@/utils/errorUtils";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import AlertModal from "@/components/common/AlertModal";
 import VideoPlayer from "@/components/common/VideoPlayer";
@@ -477,10 +478,7 @@ const MyPage: React.FC = () => {
       console.error("닉네임 변경 실패:", error);
 
       // 백엔드 에러 메시지 추출
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "닉네임 변경에 실패했습니다.";
+      const errorMessage = getErrorMessage(error, "닉네임 변경에 실패했습니다.");
       showAlert(errorMessage, "error");
     }
   };
@@ -525,7 +523,7 @@ const MyPage: React.FC = () => {
     } catch (error: any) {
       console.error("프로필 이미지 업로드 실패:", error);
       showAlert(
-        error.response?.data?.message || "이미지 업로드에 실패했습니다.",
+        getErrorMessage(error, "이미지 업로드에 실패했습니다."),
         "error",
       );
     } finally {
@@ -579,7 +577,7 @@ const MyPage: React.FC = () => {
       loadProfile();
     } catch (error: any) {
       showAlert(
-        error.response?.data?.message || "구독 처리 중 오류가 발생했습니다.",
+        getErrorMessage(error, "구독 처리 중 오류가 발생했습니다."),
         "error",
       );
     } finally {
@@ -601,7 +599,7 @@ const MyPage: React.FC = () => {
       loadProfile();
     } catch (error: any) {
       showAlert(
-        error.response?.data?.message || "구독 해지에 실패했습니다.",
+        getErrorMessage(error, "구독 해지에 실패했습니다."),
         "error",
       );
     } finally {
@@ -632,7 +630,7 @@ const MyPage: React.FC = () => {
       }
     } catch (error: any) {
       showAlert(
-        error.response?.data?.message || "인증에 실패했습니다.",
+        getErrorMessage(error, "인증에 실패했습니다."),
         "error",
       );
     } finally {
@@ -712,7 +710,7 @@ const MyPage: React.FC = () => {
     } catch (error: any) {
       console.error("선호 태그 저장 실패:", error);
       showAlert(
-        error.response?.data?.message || "선호 태그 저장에 실패했습니다.",
+        getErrorMessage(error, "선호 태그 저장에 실패했습니다."),
         "error",
       );
     } finally {
@@ -756,10 +754,7 @@ const MyPage: React.FC = () => {
     } catch (error: any) {
       console.error("회원 탈퇴 실패:", error);
 
-      const errorMessage =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "회원 탈퇴에 실패했습니다.";
+      const errorMessage = getErrorMessage(error, "회원 탈퇴에 실패했습니다.");
 
       showAlert(errorMessage, "error");
     }

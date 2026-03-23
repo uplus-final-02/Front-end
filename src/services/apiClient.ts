@@ -3,6 +3,7 @@ import axios, {
   InternalAxiosRequestConfig,
   AxiosResponse,
 } from "axios";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 // API Base URL
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
@@ -134,13 +135,6 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // 403: 탈퇴 회원 / 권한 없음 등 → 즉시 로그아웃 처리
-    if (error.response?.status === 403) {
-      // refresh token도 만료 → 로그아웃
-      // localStorage.clear();
-      return Promise.reject(error);
-    }
-
     // 401 에러 (토큰 만료) 처리 - request 인터셉터에서 놓친 경우 fallback
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
@@ -166,6 +160,16 @@ apiClient.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
+
+    if (!error.response) {
+      const networkError = new Error("네트워크 연결을 확인해주세요.");
+      return Promise.reject(networkError);
+    }
+
+    error.message = getErrorMessage(
+      error,
+      error.message || "오류가 발생했습니다.",
+    );
 
     return Promise.reject(error);
   },

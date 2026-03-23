@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import VideoPlayer from "@/components/common/VideoPlayer";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import AlertModal from "@/components/common/AlertModal";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 const ContentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -221,7 +222,7 @@ const ContentDetailPage: React.FC = () => {
     } catch (error: any) {
       console.error("재생 정보 조회 실패:", error);
       const status = error.response?.status;
-      const serverMessage = error.response?.data?.message;
+      const serverMessage = getErrorMessage(error, "재생 정보를 불러올 수 없습니다.");
 
       if (status === 403) {
         setPlayError(
@@ -286,7 +287,7 @@ const ContentDetailPage: React.FC = () => {
     } catch (error: any) {
       console.error("찜하기 실패:", error);
       setAlertModal({
-        message: error.response?.data?.message || "찜하기에 실패했습니다.",
+        message: getErrorMessage(error, "찜하기에 실패했습니다."),
         type: "error",
       });
     }

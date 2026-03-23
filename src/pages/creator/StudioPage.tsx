@@ -25,6 +25,7 @@ import {
 } from "@/services/sseService";
 import type { Content } from "@/types";
 import AlertModal from "@/components/common/AlertModal";
+import { getErrorMessage } from "@/utils/errorUtils";
 
 type PageStep =
   | "dashboard"
@@ -320,11 +321,7 @@ const StudioPage: React.FC = () => {
       );
     } catch (err: any) {
       console.error("업로드 실패:", err);
-      setErrorMsg(
-        err?.response?.data?.message ||
-          err?.message ||
-          "업로드 중 오류가 발생했습니다.",
-      );
+      setErrorMsg(getErrorMessage(err, "업로드 중 오류가 발생했습니다."));
       setPageStep("error");
     }
   };
@@ -389,7 +386,7 @@ const StudioPage: React.FC = () => {
       setEditTarget(null);
     } catch (err: any) {
       setAlertModal({
-        message: err?.response?.data?.message || "수정에 실패했습니다.",
+        message: getErrorMessage(err, "수정에 실패했습니다."),
         type: "error",
       });
     } finally {
@@ -412,7 +409,7 @@ const StudioPage: React.FC = () => {
       setDeleteTarget(null);
     } catch (err: any) {
       setAlertModal({
-        message: err?.response?.data?.message || "삭제에 실패했습니다.",
+        message: getErrorMessage(err, "삭제에 실패했습니다."),
         type: "error",
       });
     } finally {

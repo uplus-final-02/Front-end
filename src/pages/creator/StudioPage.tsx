@@ -964,6 +964,7 @@ const StudioPage: React.FC = () => {
                 <h3 className="font-semibold mb-2">업로드 가이드</h3>
                 <ul className="text-sm text-gray-400 space-y-1">
                   <li>• 비디오 길이: 최대 3분(180초)</li>
+                  <li>• 썸네일 크기: 최대 5MB 이하</li>
                   <li>• 업로드 후 트랜스코딩이 완료되면 자동 게시됩니다</li>
                   <li>• 저작권을 침해하는 콘텐츠는 삭제될 수 있습니다</li>
                 </ul>

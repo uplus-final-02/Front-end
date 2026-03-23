@@ -933,7 +933,7 @@ const StudioPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  썸네일 이미지 (선택)
+                  썸네일 이미지 (필수)
                 </label>
                 <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center hover:border-primary transition-colors">
                   <input

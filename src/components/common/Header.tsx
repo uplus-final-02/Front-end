@@ -97,6 +97,13 @@ const Header: React.FC = () => {
                   >
                     <User className="w-5 h-5" />
                     <span className="hidden md:inline">{user.nickname}</span>
+                    {user.subscriptionType !== "none" && (
+                      <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-primary text-white">
+                        {user.subscriptionType === "premium"
+                          ? "프리미엄"
+                          : "베이직"}
+                      </span>
+                    )}
                     <ChevronDown className="w-4 h-4" />
                   </button>
 

@@ -40,6 +40,7 @@ const mapContentItem = (item: any): Content => {
     releaseDate:
       item.description?.release ?? item.content?.description?.release ?? "",
     accessLevel: item.accessLevel ?? item.content?.accessLevel,
+    isOriginal: (item.accessLevel ?? item.content?.accessLevel) === "UPLUS",
     bookmarkCount: item.bookmarkCount ?? item.content?.bookmarkCount,
     viewCount: item.totalViewCount ?? item.content?.totalViewCount,
     uploaderName: item.uploaderName ?? item.content?.uploaderName ?? "",

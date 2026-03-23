@@ -315,7 +315,7 @@ const CreatorPage: React.FC = () => {
       loadComments();
     }
   }, [openPanel, activePlayInfo?.videoId, loadComments]);
-    
+
   // ── 스크롤 스냅 ──
   useEffect(() => {
     const container = containerRef.current;
@@ -509,7 +509,9 @@ const CreatorPage: React.FC = () => {
                           />
                         ) : (
                           <span className="text-xs font-bold text-gray-400">
-                            {activePlayInfo?.uploaderNickname?.charAt(0).toUpperCase() || <User className="w-5 h-5" />}
+                            {activePlayInfo?.uploaderNickname
+                              ?.charAt(0)
+                              .toUpperCase() || <User className="w-5 h-5" />}
                           </span>
                         )}
                       </div>
@@ -712,7 +714,9 @@ const CreatorPage: React.FC = () => {
                           />
                         ) : (
                           <span className="text-xs font-bold text-gray-400">
-                            {user?.nickname?.charAt(0).toUpperCase() || <User className="w-4 h-4" />}
+                            {user?.nickname?.charAt(0).toUpperCase() || (
+                              <User className="w-4 h-4" />
+                            )}
                           </span>
                         )}
                       </div>
@@ -750,7 +754,9 @@ const CreatorPage: React.FC = () => {
                           />
                         ) : (
                           <span className="text-sm font-bold text-gray-400">
-                            {activePlayInfo?.uploaderNickname?.charAt(0).toUpperCase() || <User className="w-5 h-5" />}
+                            {activePlayInfo?.uploaderNickname
+                              ?.charAt(0)
+                              .toUpperCase() || <User className="w-5 h-5" />}
                           </span>
                         )}
                       </div>
@@ -941,10 +947,18 @@ const CreatorPage: React.FC = () => {
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0">
                             {playInfo?.profileImageUrl ? (
-                              <img src={playInfo.profileImageUrl} alt={playInfo.uploaderNickname} className="w-full h-full object-cover" />
+                              <img
+                                src={playInfo.profileImageUrl}
+                                alt={playInfo.uploaderNickname}
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
                               <span className="text-xs font-bold text-gray-400">
-                                {playInfo?.uploaderNickname?.charAt(0).toUpperCase() || <User className="w-5 h-5" />}
+                                {playInfo?.uploaderNickname
+                                  ?.charAt(0)
+                                  .toUpperCase() || (
+                                  <User className="w-5 h-5" />
+                                )}
                               </span>
                             )}
                           </div>
@@ -964,14 +978,13 @@ const CreatorPage: React.FC = () => {
           </div>
 
           {/* 사이드 액션 버튼 */}
-          <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center relative">
+          <div className="flex flex-col items-center justify-end gap-5 px-3 h-full pb-28">
             <button
               onClick={() => togglePanel("comments")}
               className={`flex flex-col items-center gap-1 transition-colors ${openPanel === "comments" ? "text-primary" : "text-white hover:text-gray-300"}`}
             >
-              <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center">
+              <div className="w-11 h-11 rounded-full bg-gray-800/80 flex items-center justify-center relative">
                 <MessageCircle className="w-6 h-6" />
-                {/* 댓글 수*/}
                 {comments.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                     {comments.length}
@@ -1131,10 +1144,16 @@ const CreatorPage: React.FC = () => {
                   <div className="border-t border-gray-800 p-3 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {user?.profileImageUrl ? (
-                        <img src={user.profileImageUrl} alt="내 프로필" className="w-full h-full object-cover" />
+                        <img
+                          src={user.profileImageUrl}
+                          alt="내 프로필"
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <span className="text-xs font-bold text-gray-400">
-                          {user?.nickname?.charAt(0).toUpperCase() || <User className="w-4 h-4" />}
+                          {user?.nickname?.charAt(0).toUpperCase() || (
+                            <User className="w-4 h-4" />
+                          )}
                         </span>
                       )}
                     </div>
@@ -1165,10 +1184,16 @@ const CreatorPage: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden">
                       {playInfo?.profileImageUrl ? (
-                        <img src={playInfo.profileImageUrl} alt={playInfo.uploaderNickname} className="w-full h-full object-cover" />
+                        <img
+                          src={playInfo.profileImageUrl}
+                          alt={playInfo.uploaderNickname}
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <span className="text-sm font-bold text-gray-400">
-                          {playInfo?.uploaderNickname?.charAt(0).toUpperCase() || <User className="w-5 h-5" />}
+                          {playInfo?.uploaderNickname
+                            ?.charAt(0)
+                            .toUpperCase() || <User className="w-5 h-5" />}
                         </span>
                       )}
                     </div>
